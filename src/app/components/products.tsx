@@ -24,7 +24,7 @@ export function Products() {
     stockQuantity: "",
   });
 
-  const canModify = currentUser?.role === "Admin" || currentUser?.role === "Staff";
+  const canModify = currentUser?.role === "Admin" || currentUser?.role === "Staff" || currentUser?.role === "Cashier";
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();

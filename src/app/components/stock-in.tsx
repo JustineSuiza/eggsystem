@@ -23,7 +23,7 @@ export function StockIn() {
     dateReceived: new Date().toISOString().split("T")[0],
   });
 
-  const canAdd = currentUser?.role === "Admin" || currentUser?.role === "Staff";
+  const canAdd = currentUser?.role === "Admin" || currentUser?.role === "Staff" || currentUser?.role === "Cashier";
 
   const handleAddStock = async (e: React.FormEvent) => {
     e.preventDefault();
