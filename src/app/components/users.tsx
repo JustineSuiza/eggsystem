@@ -21,6 +21,7 @@ export function Users() {
   const [formData, setFormData] = useState({
     name: "",
     username: "",
+    email: "",
     password: "",
     role: "Staff" as UserRole,
   });
@@ -45,20 +46,32 @@ export function Users() {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (users.some((u) => u.username === formData.username)) {
       toast.error("Username already exists");
       return;
     }
 
+    if (users.some((u) => u.email === formData.email)) {
+      toast.error("Email already exists");
+      return;
+    }
+
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email: `${formData.username}@eggsystem.local`,
+      email: formData.email,
       password: formData.password,
+      options: {
+        data: {
+          name: formData.name,
+          username: formData.username,
+          role: formData.role,
+        },
+      },
     });
 
     if (signUpError || !signUpData?.user?.id) {
       console.error(signUpError);
-      toast.error("Failed to create user account");
+      toast.error(`Failed to create user account: ${signUpError?.message || 'Unknown error'}`);
       return;
     }
 
@@ -66,7 +79,7 @@ export function Users() {
       id: signUpData.user.id,
       username: formData.username,
       name: formData.name,
-      email: `${formData.username}@eggsystem.local`,
+      email: formData.email,
       role: formData.role,
     };
 
@@ -76,7 +89,7 @@ export function Users() {
 
     if (profileError) {
       console.error(profileError);
-      toast.error("Failed to create user profile");
+      toast.error("Failed to create user profile. Please try again.");
       return;
     }
 
@@ -84,14 +97,14 @@ export function Users() {
       id: signUpData.user.id,
       name: formData.name,
       username: formData.username,
-      email: profileData.email,
+      email: formData.email,
       role: formData.role,
     };
 
     setUsers([...users, newUser]);
     toast.success("User added successfully");
     setIsAddDialogOpen(false);
-    setFormData({ name: "", username: "", password: "", role: "Staff" });
+    setFormData({ name: "", username: "", email: "", password: "", role: "Staff" });
   };
 
   const handleEditUser = async (e: React.FormEvent) => {
@@ -104,11 +117,17 @@ export function Users() {
       return;
     }
 
+    if (users.some((u) => u.email === formData.email && u.id !== editingUser.id)) {
+      toast.error("Email already exists");
+      return;
+    }
+
     const { error } = await supabase
       .from("profiles")
       .update({
         name: formData.name,
         username: formData.username,
+        email: formData.email,
         role: formData.role,
       })
       .eq("id", editingUser.id);
@@ -125,6 +144,7 @@ export function Users() {
             ...u,
             name: formData.name,
             username: formData.username,
+            email: formData.email,
             role: formData.role,
           }
         : u
@@ -134,7 +154,7 @@ export function Users() {
     toast.success("User updated successfully");
     setIsEditDialogOpen(false);
     setEditingUser(null);
-    setFormData({ name: "", username: "", password: "", role: "Staff" });
+    setFormData({ name: "", username: "", email: "", password: "", role: "Staff" });
   };
 
   const handleDeleteUser = async (userId: string) => {
@@ -144,7 +164,11 @@ export function Users() {
     }
 
     if (confirm("Are you sure you want to delete this user?")) {
-      const { error } = await supabase.auth.admin.deleteUser(userId);
+      // Delete from profiles table
+      const { error } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", userId);
 
       if (error) {
         console.error(error);
@@ -162,7 +186,8 @@ export function Users() {
     setFormData({
       name: user.name,
       username: user.username,
-      password: user.password,
+      email: user.email || "",
+      password: "",
       role: user.role,
     });
     setIsEditDialogOpen(true);
@@ -221,6 +246,19 @@ export function Users() {
                   }
                   required
                   placeholder="johndoe"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                  required
+                  placeholder="john@example.com"
                 />
               </div>
               <div className="space-y-2">
@@ -357,6 +395,18 @@ export function Users() {
                 value={formData.username}
                 onChange={(e) =>
                   setFormData({ ...formData, username: e.target.value })
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Email</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
                 }
                 required
               />
