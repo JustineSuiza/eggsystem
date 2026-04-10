@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User, Product, StockInRecord, SaleRecord } from "../types";
+import { supabase } from "../../lib/supabase";
 
 interface AppContextType {
   currentUser: User | null;
@@ -141,6 +142,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
   ]);
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const loadSupabaseData = async () => {
+      const [{ data: usersData, error: usersError }, { data: productsData, error: productsError }, { data: stockData, error: stockError }, { data: salesData, error: salesError }] = await Promise.all([
+        supabase.from("users").select("*") as Promise<any>,
+        supabase.from("products").select("*") as Promise<any>,
+        supabase.from("stock_in_records").select("*") as Promise<any>,
+        supabase.from("sales_records").select("*") as Promise<any>,
+      ]);
+
+      if (!usersError && usersData && usersData.length > 0) {
+        setUsers(usersData as User[]);
+      }
+      if (!productsError && productsData && productsData.length > 0) {
+        setProducts(
+          productsData.map((product: any) => ({
+            ...product,
+            price: Number(product.price),
+            trayPrice: Number(product.tray_price),
+            stockQuantity: Number(product.stock_quantity),
+            dateAdded: product.date_added,
+          })) as Product[],
+        );
+      }
+      if (!stockError && stockData && stockData.length > 0) {
+        setStockInRecords(
+          stockData.map((record: any) => ({
+            ...record,
+            quantityAdded: Number(record.quantity_added),
+            missingQuantity: Number(record.missing_quantity),
+            crackedQuantity: Number(record.cracked_quantity),
+            dateReceived: record.date_received,
+            userId: record.user_id,
+            productId: record.product_id,
+          })) as StockInRecord[],
+        );
+      }
+      if (!salesError && salesData && salesData.length > 0) {
+        setSalesRecords(
+          salesData.map((record: any) => ({
+            ...record,
+            quantitySoldPcs: Number(record.quantity_sold_pcs),
+            quantitySoldTray: Number(record.quantity_sold_tray),
+            totalAmount: Number(record.total_amount),
+            saleDate: record.sale_date,
+            userId: record.user_id,
+            productId: record.product_id,
+          })) as SaleRecord[],
+        );
+      }
+    };
+
+    void loadSupabaseData();
+  }, []);
 
   return (
     <AppContext.Provider

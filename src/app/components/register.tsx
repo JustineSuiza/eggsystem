@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router";
 import { useApp } from "../context/app-context";
+import { supabase } from "../../lib/supabase";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -26,7 +27,7 @@ export function Register() {
     }
   }, [currentUser, navigate]);
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
@@ -47,7 +48,6 @@ export function Register() {
       return;
     }
 
-    // Create new user
     const newUser = {
       id: Date.now().toString(),
       name: formData.name,
@@ -55,6 +55,14 @@ export function Register() {
       password: formData.password,
       role: formData.role,
     };
+
+    const { data, error } = await supabase.from("users").insert([newUser]);
+
+    if (error) {
+      console.error(error);
+      toast.error("Unable to create account. Please try again.");
+      return;
+    }
 
     setUsers([...users, newUser]);
     toast.success("Account created successfully! Please login.");
