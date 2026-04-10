@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router";
 import { useApp } from "../context/app-context";
+import { supabase } from "../../lib/supabase";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -9,7 +10,7 @@ import { toast } from "sonner";
 import { Egg } from "lucide-react";
 
 export function Login() {
-  const [username, setUsername] = useState("");
+  const [emailOrUsername, setEmailOrUsername] = useState("");
   const [password, setPassword] = useState("");
   const { users, setCurrentUser, currentUser } = useApp();
   const navigate = useNavigate();
@@ -20,20 +21,37 @@ export function Login() {
     }
   }, [currentUser, navigate]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const user = users.find(
-      (u) => u.username === username && u.password === password
+      (u) => u.email === emailOrUsername || u.username === emailOrUsername,
     );
 
-    if (user) {
-      setCurrentUser(user);
-      toast.success(`Welcome back, ${user.name}!`);
-      navigate("/");
-    } else {
-      toast.error("Invalid username or password");
+    if (!user) {
+      toast.error("Invalid email or password");
+      return;
     }
+
+    if (!user.email) {
+      toast.error("No email found for this account. Please use a Supabase-backed account.");
+      return;
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password,
+    });
+
+    if (error || !data.session) {
+      console.error(error);
+      toast.error("Invalid email or password");
+      return;
+    }
+
+    setCurrentUser(user);
+    toast.success(`Welcome back, ${user.name}!`);
+    navigate("/");
   };
 
   return (
@@ -57,12 +75,12 @@ export function Login() {
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="emailOrUsername">Email or Username</Label>
               <Input
-                id="username"
+                id="emailOrUsername"
                 type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                value={emailOrUsername}
+                onChange={(e) => setEmailOrUsername(e.target.value)}
                 required
               />
             </div>

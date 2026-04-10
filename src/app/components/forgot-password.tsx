@@ -1,19 +1,17 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router";
 import { useApp } from "../context/app-context";
+import { supabase } from "../../lib/supabase";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { toast } from "sonner";
-import { Egg, ArrowLeft, Key } from "lucide-react";
+import { ArrowLeft, Key } from "lucide-react";
 
 export function ForgotPassword() {
-  const [username, setUsername] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [step, setStep] = useState<"username" | "reset">("username");
-  const { users, setUsers, currentUser } = useApp();
+  const [identifier, setIdentifier] = useState("");
+  const { users, currentUser } = useApp();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -22,40 +20,29 @@ export function ForgotPassword() {
     }
   }, [currentUser, navigate]);
 
-  const handleCheckUsername = (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const user = users.find((u) => u.username === username);
-    if (user) {
-      setStep("reset");
-      toast.success("Username found. Please enter your new password.");
-    } else {
-      toast.error("Username not found");
-    }
-  };
-
-  const handleResetPassword = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      toast.error("Password must be at least 6 characters long");
-      return;
-    }
-
-    // Update user password
-    const updatedUsers = users.map((user) =>
-      user.username === username
-        ? { ...user, password: newPassword }
-        : user
+    const user = users.find(
+      (u) => u.email === identifier || u.username === identifier,
     );
 
-    setUsers(updatedUsers);
-    toast.success("Password reset successfully! Please login with your new password.");
+    if (!user?.email) {
+      toast.error("Email or username not found");
+      return;
+    }
+
+    const { data, error } = await supabase.auth.resetPasswordForEmail(user.email);
+
+    if (error) {
+      console.error(error);
+      toast.error("Unable to send password reset email. Please try again.");
+      return;
+    }
+
+    toast.success(
+      "Password reset email sent. Check your inbox and follow the instructions to reset your password.",
+    );
     navigate("/login");
   };
 
@@ -70,61 +57,26 @@ export function ForgotPassword() {
           </div>
           <CardTitle className="text-2xl">Forgot Password</CardTitle>
           <CardDescription>
-            {step === "username"
-              ? "Enter your username to reset your password"
-              : "Enter your new password"
-            }
+            Enter your email or username to receive a password reset email.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {step === "username" ? (
-            <form onSubmit={handleCheckUsername} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  placeholder="Enter your username"
-                />
-              </div>
-              <Button type="submit" className="w-full">
-                Continue
-              </Button>
-            </form>
-          ) : (
-            <form onSubmit={handleResetPassword} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="newPassword">New Password</Label>
-                <Input
-                  id="newPassword"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  placeholder="••••••••"
-                  minLength={6}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  placeholder="••••••••"
-                  minLength={6}
-                />
-              </div>
-              <Button type="submit" className="w-full">
-                Reset Password
-              </Button>
-            </form>
-          )}
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="identifier">Email or Username</Label>
+              <Input
+                id="identifier"
+                type="text"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                required
+                placeholder="Enter your email or username"
+              />
+            </div>
+            <Button type="submit" className="w-full">
+              Send reset email
+            </Button>
+          </form>
           <div className="mt-6 text-center">
             <Link
               to="/login"

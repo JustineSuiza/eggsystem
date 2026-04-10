@@ -145,16 +145,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const loadSupabaseData = async () => {
-      const [{ data: usersData, error: usersError }, { data: productsData, error: productsError }, { data: stockData, error: stockError }, { data: salesData, error: salesError }] = await Promise.all([
-        supabase.from("users").select("*") as Promise<any>,
+      const [{ data: sessionData }, { data: profilesData, error: profilesError }, { data: productsData, error: productsError }, { data: stockData, error: stockError }, { data: salesData, error: salesError }] = await Promise.all([
+        supabase.auth.getSession() as Promise<any>,
+        supabase.from("profiles").select("*") as Promise<any>,
         supabase.from("products").select("*") as Promise<any>,
         supabase.from("stock_in_records").select("*") as Promise<any>,
         supabase.from("sales_records").select("*") as Promise<any>,
       ]);
 
-      if (!usersError && usersData && usersData.length > 0) {
-        setUsers(usersData as User[]);
+      if (!profilesError && profilesData && profilesData.length > 0) {
+        setUsers(
+          profilesData.map((profile: any) => ({
+            id: profile.id,
+            name: profile.name,
+            username: profile.username,
+            email: profile.email,
+            role: profile.role,
+          })) as User[],
+        );
       }
+
+      if (sessionData?.session?.user?.id && profilesData) {
+        const matchingProfile = profilesData.find((profile: any) => profile.id === sessionData.session.user.id);
+        if (matchingProfile) {
+          setCurrentUser({
+            id: matchingProfile.id,
+            name: matchingProfile.name,
+            username: matchingProfile.username,
+            email: matchingProfile.email,
+            role: matchingProfile.role,
+          });
+        }
+      }
+
       if (!productsError && productsData && productsData.length > 0) {
         setProducts(
           productsData.map((product: any) => ({

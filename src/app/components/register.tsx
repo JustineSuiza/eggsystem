@@ -12,7 +12,7 @@ import { Egg, ArrowLeft } from "lucide-react";
 
 export function Register() {
   const [formData, setFormData] = useState({
-    name: "",
+    email: "",
     username: "",
     password: "",
     confirmPassword: "",
@@ -41,26 +41,47 @@ export function Register() {
       return;
     }
 
-    // Check if username already exists
-    const existingUser = users.find((u) => u.username === formData.username);
+    // Check if email or username already exists
+    const existingUser = users.find(
+      (u) => u.email === formData.email || u.username === formData.username,
+    );
     if (existingUser) {
-      toast.error("Username already exists");
+      toast.error("Email or username already exists");
+      return;
+    }
+
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp(
+      {
+        email: formData.email,
+        password: formData.password,
+      },
+      {
+        data: {
+          name: formData.username,
+          role: formData.role,
+        },
+      },
+    );
+
+    if (signUpError || !signUpData?.user?.id) {
+      console.error(signUpError);
+      toast.error("Unable to create account. Please try again.");
       return;
     }
 
     const newUser = {
-      id: Date.now().toString(),
-      name: formData.name,
+      id: signUpData.user.id,
+      name: formData.username,
       username: formData.username,
-      password: formData.password,
+      email: formData.email,
       role: formData.role,
     };
 
-    const { data, error } = await supabase.from("users").insert([newUser]);
+    const { error } = await supabase.from("profiles").insert([newUser]);
 
     if (error) {
       console.error(error);
-      toast.error("Unable to create account. Please try again.");
+      toast.error("Unable to save profile. Please try again.");
       return;
     }
 
@@ -86,14 +107,14 @@ export function Register() {
         <CardContent>
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="name"
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required
-                placeholder="John Doe"
+                placeholder="john@example.com"
               />
             </div>
             <div className="space-y-2">
