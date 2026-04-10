@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useApp } from "../context/app-context";
+import { supabase } from "../../lib/supabase";
 import { User, UserRole } from "../types";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -42,20 +43,48 @@ export function Users() {
     );
   }
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if username already exists
     if (users.some((u) => u.username === formData.username)) {
       toast.error("Username already exists");
       return;
     }
 
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email: `${formData.username}@eggsystem.local`,
+      password: formData.password,
+    });
+
+    if (signUpError || !signUpData?.user?.id) {
+      console.error(signUpError);
+      toast.error("Failed to create user account");
+      return;
+    }
+
+    const profileData = {
+      id: signUpData.user.id,
+      username: formData.username,
+      name: formData.name,
+      email: `${formData.username}@eggsystem.local`,
+      role: formData.role,
+    };
+
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .insert([profileData]);
+
+    if (profileError) {
+      console.error(profileError);
+      toast.error("Failed to create user profile");
+      return;
+    }
+
     const newUser: User = {
-      id: Date.now().toString(),
+      id: signUpData.user.id,
       name: formData.name,
       username: formData.username,
-      password: formData.password,
+      email: profileData.email,
       role: formData.role,
     };
 
@@ -65,14 +94,28 @@ export function Users() {
     setFormData({ name: "", username: "", password: "", role: "Staff" });
   };
 
-  const handleEditUser = (e: React.FormEvent) => {
+  const handleEditUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!editingUser) return;
 
-    // Check if username already exists (excluding current user)
     if (users.some((u) => u.username === formData.username && u.id !== editingUser.id)) {
       toast.error("Username already exists");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        name: formData.name,
+        username: formData.username,
+        role: formData.role,
+      })
+      .eq("id", editingUser.id);
+
+    if (error) {
+      console.error(error);
+      toast.error("Failed to update user");
       return;
     }
 
@@ -82,7 +125,6 @@ export function Users() {
             ...u,
             name: formData.name,
             username: formData.username,
-            password: formData.password,
             role: formData.role,
           }
         : u
@@ -95,13 +137,21 @@ export function Users() {
     setFormData({ name: "", username: "", password: "", role: "Staff" });
   };
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     if (userId === currentUser?.id) {
       toast.error("You cannot delete your own account");
       return;
     }
 
     if (confirm("Are you sure you want to delete this user?")) {
+      const { error } = await supabase.auth.admin.deleteUser(userId);
+
+      if (error) {
+        console.error(error);
+        toast.error("Failed to delete user");
+        return;
+      }
+
       setUsers(users.filter((u) => u.id !== userId));
       toast.success("User deleted successfully");
     }

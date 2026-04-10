@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useApp } from "../context/app-context";
+import { supabase } from "../../lib/supabase";
 import { Product } from "../types";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -25,28 +26,61 @@ export function Products() {
 
   const canModify = currentUser?.role === "Admin" || currentUser?.role === "Staff";
 
-  const handleAddProduct = (e: React.FormEvent) => {
+  const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const newProduct: Product = {
-      id: Date.now().toString(),
+    const newProduct = {
       name: formData.name,
       price: parseFloat(formData.price),
-      trayPrice: parseFloat(formData.trayPrice),
-      stockQuantity: parseInt(formData.stockQuantity),
-      dateAdded: new Date().toISOString().split("T")[0],
+      tray_price: parseFloat(formData.trayPrice),
+      stock_quantity: parseInt(formData.stockQuantity),
+      date_added: new Date().toISOString().split("T")[0],
     };
 
-    setProducts([...products, newProduct]);
+    const { data, error } = await supabase.from("products").insert([newProduct]).select();
+
+    if (error) {
+      console.error(error);
+      toast.error("Failed to add product");
+      return;
+    }
+
+    if (data && data.length > 0) {
+      setProducts([...products, {
+        id: data[0].id.toString(),
+        name: data[0].name,
+        price: data[0].price,
+        trayPrice: data[0].tray_price,
+        stockQuantity: data[0].stock_quantity,
+        dateAdded: data[0].date_added,
+      }]);
+    }
+
     toast.success("Product added successfully");
     setIsAddDialogOpen(false);
     setFormData({ name: "", price: "", trayPrice: "", stockQuantity: "" });
   };
 
-  const handleEditProduct = (e: React.FormEvent) => {
+  const handleEditProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!editingProduct) return;
+
+    const { error } = await supabase
+      .from("products")
+      .update({
+        name: formData.name,
+        price: parseFloat(formData.price),
+        tray_price: parseFloat(formData.trayPrice),
+        stock_quantity: parseInt(formData.stockQuantity),
+      })
+      .eq("id", parseInt(editingProduct.id));
+
+    if (error) {
+      console.error(error);
+      toast.error("Failed to update product");
+      return;
+    }
 
     const updatedProducts = products.map((p) =>
       p.id === editingProduct.id
@@ -67,8 +101,19 @@ export function Products() {
     setFormData({ name: "", price: "", trayPrice: "", stockQuantity: "" });
   };
 
-  const handleDeleteProduct = (productId: string) => {
+  const handleDeleteProduct = async (productId: string) => {
     if (confirm("Are you sure you want to delete this product?")) {
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", parseInt(productId));
+
+      if (error) {
+        console.error(error);
+        toast.error("Failed to delete product");
+        return;
+      }
+
       setProducts(products.filter((p) => p.id !== productId));
       toast.success("Product deleted successfully");
     }

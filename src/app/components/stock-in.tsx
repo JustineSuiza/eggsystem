@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useApp } from "../context/app-context";
+import { supabase } from "../../lib/supabase";
 import { StockInRecord } from "../types";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -24,13 +25,47 @@ export function StockIn() {
 
   const canAdd = currentUser?.role === "Admin" || currentUser?.role === "Staff";
 
-  const handleAddStock = (e: React.FormEvent) => {
+  const handleAddStock = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!currentUser) return;
 
-    const newStockIn: StockInRecord = {
-      id: Date.now().toString(),
+    const actualStockAdded = parseInt(formData.quantityAdded) - (parseInt(formData.missingQuantity) || 0) - (parseInt(formData.crackedQuantity) || 0);
+
+    // Insert stock in record
+    const stockInData = {
+      product_id: parseInt(formData.productId),
+      quantity_added: parseInt(formData.quantityAdded),
+      missing_quantity: parseInt(formData.missingQuantity) || 0,
+      cracked_quantity: parseInt(formData.crackedQuantity) || 0,
+      date_received: formData.dateReceived,
+      user_id: currentUser.id,
+    };
+
+    const { data: stockData, error: stockError } = await supabase
+      .from("stock_in_records")
+      .insert([stockInData])
+      .select();
+
+    if (stockError || !stockData || stockData.length === 0) {
+      console.error(stockError);
+      toast.error("Failed to add stock record");
+      return;
+    }
+
+    // Update product stock quantity
+    const { error: updateError } = await supabase
+      .from("products")
+      .update({ stock_quantity: null })
+      .eq("id", parseInt(formData.productId))
+      .select();
+
+    if (updateError) {
+      console.error(updateError);
+    }
+
+    const newRecord: StockInRecord = {
+      id: stockData[0].id.toString(),
       productId: formData.productId,
       quantityAdded: parseInt(formData.quantityAdded),
       missingQuantity: parseInt(formData.missingQuantity) || 0,
@@ -39,18 +74,14 @@ export function StockIn() {
       userId: currentUser.id,
     };
 
-    // Calculate actual stock added (received - missing - cracked)
-    const actualStockAdded = parseInt(formData.quantityAdded) - (parseInt(formData.missingQuantity) || 0) - (parseInt(formData.crackedQuantity) || 0);
-
-    // Update product stock quantity
+    setStockInRecords([newRecord, ...stockInRecords]);
     const updatedProducts = products.map((p) =>
       p.id === formData.productId
         ? { ...p, stockQuantity: p.stockQuantity + actualStockAdded }
         : p
     );
-
     setProducts(updatedProducts);
-    setStockInRecords([newStockIn, ...stockInRecords]);
+
     toast.success("Stock added successfully");
     setIsDialogOpen(false);
     setFormData({

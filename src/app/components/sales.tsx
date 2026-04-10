@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useApp } from "../context/app-context";
+import { supabase } from "../../lib/supabase";
 import { SaleRecord } from "../types";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -24,23 +25,21 @@ export function Sales() {
     saleDate: new Date().toISOString().split("T")[0],
   });
 
-  const handleRecordSale = (e: React.FormEvent) => {
+  const handleRecordSale = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!currentUser) return;
 
-    // Validate that at least one product is selected
     if (saleItems.length === 0 || saleItems.every(item => !item.productId)) {
       toast.error("Please select at least one product");
       return;
     }
 
-    const newSales: SaleRecord[] = [];
+    const salesToInsert: any[] = [];
     let hasErrors = false;
 
-    // Process each sale item
     for (const item of saleItems) {
-      if (!item.productId) continue; // Skip empty items
+      if (!item.productId) continue;
 
       const product = products.find((p) => p.id === item.productId);
       if (!product) {
@@ -51,7 +50,7 @@ export function Sales() {
 
       const quantitySoldPcs = parseInt(item.quantitySoldPcs) || 0;
       const quantitySoldTray = parseInt(item.quantitySoldTray) || 0;
-      const totalQuantity = quantitySoldPcs + (quantitySoldTray * 30); // Assuming 30 pcs per tray
+      const totalQuantity = quantitySoldPcs + (quantitySoldTray * 30);
       
       if (totalQuantity <= 0) {
         toast.error("Please enter valid quantities for all products");
@@ -67,22 +66,39 @@ export function Sales() {
 
       const totalAmount = (product.price * quantitySoldPcs) + (product.trayPrice * quantitySoldTray);
 
-      const newSale: SaleRecord = {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9), // Unique ID for each item
-        productId: item.productId,
-        quantitySoldPcs: quantitySoldPcs,
-        quantitySoldTray: quantitySoldTray,
-        totalAmount: totalAmount,
-        saleDate: formData.saleDate,
-        userId: currentUser.id,
-      };
-
-      newSales.push(newSale);
+      salesToInsert.push({
+        product_id: parseInt(item.productId),
+        quantity_sold_pcs: quantitySoldPcs,
+        quantity_sold_tray: quantitySoldTray,
+        total_amount: totalAmount,
+        sale_date: formData.saleDate,
+        user_id: currentUser.id,
+      });
     }
 
     if (hasErrors) return;
 
-    // Update product stock quantities
+    const { data: salesData, error: salesError } = await supabase
+      .from("sales_records")
+      .insert(salesToInsert)
+      .select();
+
+    if (salesError || !salesData) {
+      console.error(salesError);
+      toast.error("Failed to record sales");
+      return;
+    }
+
+    const newSales: SaleRecord[] = salesData.map((sale: any) => ({
+      id: sale.id.toString(),
+      productId: sale.product_id.toString(),
+      quantitySoldPcs: sale.quantity_sold_pcs,
+      quantitySoldTray: sale.quantity_sold_tray,
+      totalAmount: sale.total_amount,
+      saleDate: sale.sale_date,
+      userId: sale.user_id,
+    }));
+
     const updatedProducts = products.map((product) => {
       const totalSold = newSales
         .filter(sale => sale.productId === product.id)
