@@ -69,12 +69,8 @@ export function Layout() {
 
         <div className="p-6 bg-[#d4a574]/25 rounded-tr-xl rounded-br-xl shadow-inner shadow-[#c67c4e]/30">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-[#c67c4e] flex items-center justify-center overflow-hidden ring-2 ring-[#d4a574]">
-              <img 
-                src="/egg-logo_535345-3522.png" 
-                alt="Egg Logo" 
-                className="h-full w-full object-cover rounded-full"
-              />
+            <div className="h-10 w-10 rounded-full bg-[#c67c4e] flex items-center justify-center ring-2 ring-[#d4a574]">
+              <Egg className="h-5 w-5 text-white" />
             </div>
             <div>
               <h1 className="font-bold text-lg text-[#3c2f25]">Egg Inventory</h1>
