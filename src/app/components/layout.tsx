@@ -71,7 +71,7 @@ export function Layout() {
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-full bg-[#c67c4e] flex items-center justify-center overflow-hidden ring-2 ring-[#d4a574]">
               <img 
-                src="/egg-logo_535345-3522.avif" 
+                src="/egg-logo_535345-3522.png" 
                 alt="Egg Logo" 
                 className="h-full w-full object-cover rounded-full"
               />
