@@ -10,12 +10,10 @@ export function Dashboard() {
   // Calculate statistics
   const totalProducts = products.length;
   const totalStock = products.reduce((sum, p) => sum + p.stockQuantity, 0);
-  const lowStockProducts = products.filter((p) => p.stockQuantity < 50);
+  const lowStockProducts = products.filter((p) => p.stockQuantity <= 50);
   
-  const todayDate = "2026-03-13";
-  const todaySales = salesRecords.filter((s) => s.saleDate === todayDate);
-  const totalSalesToday = todaySales.reduce((sum, s) => sum + s.totalAmount, 0);
-  const totalItemsSoldToday = todaySales.reduce((sum, s) => sum + s.quantitySoldPcs + (s.quantitySoldTray * 30), 0);
+  const totalRevenue = salesRecords.reduce((sum, s) => sum + s.totalAmount, 0);
+  const totalItemsSold = salesRecords.reduce((sum, s) => sum + s.quantitySoldPcs + (s.quantitySoldTray * 30), 0);
 
   const recentStockIn = stockInRecords
     .sort((a, b) => new Date(b.dateReceived).getTime() - new Date(a.dateReceived).getTime())
@@ -70,8 +68,8 @@ export function Dashboard() {
             <DollarSign className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">₱{totalSalesToday.toFixed(2)}</div>
-            <p className="text-xs text-gray-500 mt-1">{totalItemsSoldToday} items sold</p>
+            <div className="text-2xl font-semibold">₱{totalRevenue.toFixed(2)}</div>
+            <p className="text-xs text-gray-500 mt-1">{totalItemsSold} items sold</p>
           </CardContent>
         </Card>
 
@@ -82,7 +80,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold">{lowStockProducts.length}</div>
-            <p className="text-xs text-gray-500 mt-1">Products below 50 items</p>
+            <p className="text-xs text-gray-500 mt-1">Products with 50 or fewer items</p>
           </CardContent>
         </Card>
       </div>
