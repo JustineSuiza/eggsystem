@@ -7,6 +7,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { toast } from "sonner";
+import { Egg } from "lucide-react";
 
 export function Login() {
   const [emailOrUsername, setEmailOrUsername] = useState("");
@@ -70,12 +71,8 @@ export function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="h-16 w-16 rounded-full bg-amber-500 flex items-center justify-center overflow-hidden">
-              <img
-                src="/egg-logo_535345-3522.avif"
-                alt="Egg Logo"
-                className="h-full w-full object-cover"
-              />
+            <div className="h-16 w-16 rounded-full bg-amber-500 flex items-center justify-center">
+              <Egg className="h-8 w-8 text-white" />
             </div>
           </div>
           <CardTitle className="text-2xl">Egg Inventory System</CardTitle>
