@@ -26,11 +26,11 @@ export function Dashboard() {
     .slice(0, 5);
 
   const getProductName = (productId: string) => {
-    return products.find((p) => p.id === productId)?.name || "Unknown";
+    return products.find((p) => p.id.toString() === productId.toString())?.name || "Unknown";
   };
 
   const getUserName = (userId: string) => {
-    return users.find((u) => u.id === userId)?.name || "Unknown";
+    return users.find((u) => u.id.toString() === userId.toString())?.name || "Unknown";
   };
 
   return (

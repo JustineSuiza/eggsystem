@@ -9,6 +9,7 @@ import { Label } from "./ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "./ui/alert-dialog";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "./ui/badge";
@@ -17,6 +18,7 @@ export function Products() {
   const { products, setProducts, currentUser } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -113,21 +115,20 @@ export function Products() {
   };
 
   const handleDeleteProduct = async (productId: string) => {
-    if (confirm("Are you sure you want to delete this product?")) {
-      const { error } = await supabase
-        .from("products")
-        .delete()
-        .eq("id", parseInt(productId));
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", parseInt(productId));
 
-      if (error) {
-        console.error(error);
-        toast.error("Failed to delete product");
-        return;
-      }
-
-      setProducts(products.filter((p) => p.id !== productId));
-      toast.success("Product deleted successfully");
+    if (error) {
+      console.error(error);
+      toast.error("Failed to delete product");
+      return;
     }
+
+    setProducts(products.filter((p) => p.id !== productId));
+    toast.success("Product deleted successfully");
+    setProductToDelete(null);
   };
 
   const openEditDialog = (product: Product) => {
@@ -156,7 +157,7 @@ export function Products() {
                 Add Product
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-white">
+            <DialogContent className="bg-white animate-in fade-in slide-in-from-bottom-4 duration-300">
               <DialogHeader>
                 <DialogTitle>Add New Product</DialogTitle>
                 <DialogDescription>
@@ -275,7 +276,7 @@ export function Products() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteProduct(product.id)}
+                            onClick={() => setProductToDelete(product.id)}
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
@@ -292,7 +293,7 @@ export function Products() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="bg-white">
+        <DialogContent className="bg-white animate-in fade-in slide-in-from-bottom-4 duration-300">
           <DialogHeader>
             <DialogTitle>Edit Product</DialogTitle>
             <DialogDescription>
@@ -356,6 +357,26 @@ export function Products() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
+        <AlertDialogContent className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Product</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this product? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-4">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => productToDelete && handleDeleteProduct(productToDelete)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

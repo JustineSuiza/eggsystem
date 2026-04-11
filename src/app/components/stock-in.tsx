@@ -9,13 +9,15 @@ import { Label } from "./ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "./ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { toast } from "sonner";
-import { Plus, TrendingUp } from "lucide-react";
+import { Plus, TrendingUp, Trash2 } from "lucide-react";
 
 export function StockIn() {
   const { products, setProducts, stockInRecords, setStockInRecords, currentUser, users } = useApp();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     productId: "",
     quantityAdded: "",
@@ -32,7 +34,7 @@ export function StockIn() {
     if (!currentUser) return;
 
     // Insert stock in record
-    const product = products.find((p) => p.id === formData.productId);
+    const product = products.find((p) => p.id.toString() === formData.productId.toString());
     if (!product) {
       toast.error("Selected product not found.");
       return;
@@ -107,7 +109,7 @@ export function StockIn() {
 
     setStockInRecords([newRecord, ...stockInRecords]);
     const updatedProducts = products.map((p) =>
-      p.id === formData.productId
+      p.id.toString() === formData.productId.toString()
         ? { ...p, stockQuantity: p.stockQuantity + actualStockAdded }
         : p
     );
@@ -125,13 +127,28 @@ export function StockIn() {
   };
 
   const getProductName = (productId: string) => {
-    return products.find((p) => p.id === productId)?.name || "Unknown";
+    return products.find((p) => p.id.toString() === productId.toString())?.name || "Unknown";
   };
 
   const getUserName = (userId: string) => {
-    return users.find((u) => u.id === userId)?.name || "Unknown";
+    return users.find((u) => u.id.toString() === userId.toString())?.name || "Unknown"
   };
+  const handleDeleteRecord = async (recordId: string) => {
+    const { error } = await supabase
+      .from("stock_in_records")
+      .delete()
+      .eq("id", parseInt(recordId, 10));
 
+    if (error) {
+      console.error("Delete error:", error);
+      toast.error("Failed to delete record");
+      return;
+    }
+
+    setStockInRecords(stockInRecords.filter((r) => r.id !== recordId));
+    toast.success("Record deleted successfully");
+    setRecordToDelete(null);
+  };
   // Sort records by date (newest first)
   const sortedRecords = [...stockInRecords].sort(
     (a, b) => new Date(b.dateReceived).getTime() - new Date(a.dateReceived).getTime()
@@ -179,6 +196,21 @@ export function StockIn() {
                     </SelectContent>
                   </Select>
                 </div>
+                {formData.productId && (
+                  <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">
+                    {(() => {
+                      const selectedProduct = products.find((p) => p.id.toString() === formData.productId.toString());
+                      if (!selectedProduct) return null;
+                      return (
+                        <div className="space-y-1">
+                          <p className="font-medium">Selected product</p>
+                          <p>Name: {selectedProduct.name}</p>
+                          <p>Stock: {selectedProduct.stockQuantity} pcs</p>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="quantity">Quantity Received</Label>
                   <Input
@@ -264,12 +296,13 @@ export function StockIn() {
                   <TableHead>Cracked</TableHead>
                   <TableHead>Date Received</TableHead>
                   <TableHead>Recorded By</TableHead>
+                  {currentUser?.role === "Admin" && <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sortedRecords.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                    <TableCell colSpan={currentUser?.role === "Admin" ? 7 : 6} className="text-center text-gray-500 py-8">
                       No stock records yet
                     </TableCell>
                   </TableRow>
@@ -298,6 +331,18 @@ export function StockIn() {
                       <TableCell className="text-gray-500">
                         {getUserName(record.userId)}
                       </TableCell>
+                      {currentUser?.role === "Admin" && (
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setRecordToDelete(record.id)}
+                            className="hover:text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}
@@ -306,6 +351,26 @@ export function StockIn() {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!recordToDelete} onOpenChange={(open) => !open && setRecordToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Record</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this stock record? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-4">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => recordToDelete && handleDeleteRecord(recordToDelete)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

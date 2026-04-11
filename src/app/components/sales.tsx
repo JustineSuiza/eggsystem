@@ -9,9 +9,10 @@ import { Label } from "./ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "./ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { toast } from "sonner";
-import { Plus, TrendingDown, DollarSign, Printer } from "lucide-react";
+import { Plus, TrendingDown, DollarSign, Printer, Trash2 } from "lucide-react";
 import { Badge } from "./ui/badge";
 
 export function Sales() {
@@ -19,6 +20,7 @@ export function Sales() {
 
   console.log("Sales component - currentUser:", currentUser);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [saleToDelete, setSaleToDelete] = useState<string | null>(null);
   const [saleItems, setSaleItems] = useState([{
     productId: "",
     quantitySoldPcs: "",
@@ -38,13 +40,16 @@ export function Sales() {
       return;
     }
 
+    // Get the first ID upfront to avoid race condition
+    let nextId = await getNextNumericId("sales_records");
     const salesToInsert: any[] = [];
     let hasErrors = false;
 
-    for (const item of saleItems) {
+    for (let i = 0; i < saleItems.length; i++) {
+      const item = saleItems[i];
       if (!item.productId) continue;
 
-      const product = products.find((p) => p.id === item.productId);
+      const product = products.find((p) => p.id.toString() === item.productId.toString());
       if (!product) {
         toast.error(`Product not found for one of the items`);
         hasErrors = true;
@@ -69,13 +74,13 @@ export function Sales() {
 
       const totalAmount = (product.price * quantitySoldPcs) + (product.trayPrice * quantitySoldTray);
 
-    if (!currentUser) {
-      toast.error("Unable to identify the current user. Please log in again.");
-      return;
-    }
+      if (!currentUser) {
+        toast.error("Unable to identify the current user. Please log in again.");
+        return;
+      }
 
       salesToInsert.push({
-        id: await getNextNumericId("sales_records"),
+        id: nextId,
         product_id: parseInt(item.productId),
         quantity_sold_pcs: quantitySoldPcs,
         quantity_sold_tray: quantitySoldTray,
@@ -83,6 +88,7 @@ export function Sales() {
         sale_date: formData.saleDate,
         user_id: parseInt(currentUser.id, 10),
       });
+      nextId++; // Increment for next item
     }
 
     if (hasErrors) return;
@@ -113,7 +119,7 @@ export function Sales() {
 
     const updatedProducts = products.map((product) => {
       const totalSold = newSales
-        .filter(sale => sale.productId === product.id)
+        .filter(sale => sale.productId.toString() === product.id.toString())
         .reduce((sum, sale) => sum + sale.quantitySoldPcs + (sale.quantitySoldTray * 30), 0);
       
       return {
@@ -161,11 +167,28 @@ export function Sales() {
   };
 
   const getProductName = (productId: string) => {
-    return products.find((p) => p.id === productId)?.name || "Unknown";
+    return products.find((p) => p.id.toString() === productId.toString())?.name || "Unknown";
   };
 
   const getUserName = (userId: string) => {
-    return users.find((u) => u.id === userId)?.name || "Unknown";
+    return users.find((u) => u.id.toString() === userId.toString())?.name || "Unknown";
+  };
+
+  const handleDeleteSale = async (saleId: string) => {
+    const { error } = await supabase
+      .from("sales_records")
+      .delete()
+      .eq("id", parseInt(saleId, 10));
+
+    if (error) {
+      console.error("Delete error:", error);
+      toast.error("Failed to delete sale record");
+      return;
+    }
+
+    setSalesRecords(salesRecords.filter((s) => s.id !== saleId));
+    toast.success("Sale record deleted successfully");
+    setSaleToDelete(null);
   };
 
   const handlePrint = () => {
@@ -361,6 +384,23 @@ export function Sales() {
                       </Select>
                     </div>
 
+                    {item.productId && (
+                      <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-700">
+                        {(() => {
+                          const selectedProduct = products.find((p) => p.id.toString() === item.productId.toString());
+                          if (!selectedProduct) return null;
+                          return (
+                            <div className="space-y-1">
+                              <p className="font-medium">{selectedProduct.name}</p>
+                              <p>Stock: {selectedProduct.stockQuantity} pcs</p>
+                              <p>Price (pcs): ₱{selectedProduct.price.toFixed(2)}</p>
+                              <p>Price (tray): ₱{selectedProduct.trayPrice.toFixed(2)}</p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <Label htmlFor={`quantityPcs-${index}`}>Sold pcs</Label>
@@ -386,33 +426,27 @@ export function Sales() {
                       </div>
                     </div>
 
-                    {item.productId && (
-                      <p className="text-sm text-gray-500">
-                        Available stock: {products.find((p) => p.id === item.productId)?.stockQuantity || 0} pcs
-                      </p>
-                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="date">Sale Date</Label>
+                      <Input
+                        id="date"
+                        type="date"
+                        value={formData.saleDate}
+                        onChange={(e) =>
+                          setFormData({ ...formData, saleDate: e.target.value })
+                        }
+                        required
+                      />
+                    </div>
                   </div>
                 ))}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="date">Sale Date</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={formData.saleDate}
-                  onChange={(e) =>
-                    setFormData({ ...formData, saleDate: e.target.value })
-                  }
-                  required
-                />
               </div>
 
               {(() => {
                 const itemsWithTotals = saleItems
                   .map((item, index) => {
                     if (!item.productId) return null;
-                    const product = products.find(p => p.id === item.productId);
+                    const product = products.find(p => p.id.toString() === item.productId.toString());
                     if (!product) return null;
                     const pcs = parseInt(item.quantitySoldPcs) || 0;
                     const trays = parseInt(item.quantitySoldTray) || 0;
@@ -548,12 +582,13 @@ export function Sales() {
                   <TableHead>Total Amount</TableHead>
                   <TableHead>Sale Date</TableHead>
                   <TableHead>Cashier</TableHead>
+                  {currentUser?.role === "Admin" && <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredSales.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                    <TableCell colSpan={currentUser?.role === "Admin" ? 7 : 6} className="text-center text-gray-500 py-8">
                       No sales records for this date
                     </TableCell>
                   </TableRow>
@@ -576,6 +611,18 @@ export function Sales() {
                       <TableCell className="text-gray-500">
                         {getUserName(sale.userId)}
                       </TableCell>
+                      {currentUser?.role === "Admin" && (
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSaleToDelete(sale.id)}
+                            className="hover:text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}
@@ -584,6 +631,26 @@ export function Sales() {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!saleToDelete} onOpenChange={(open) => !open && setSaleToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Sale Record</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this sale record? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-4">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => saleToDelete && handleDeleteSale(saleToDelete)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
