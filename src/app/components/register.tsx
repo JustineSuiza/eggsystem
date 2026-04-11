@@ -18,7 +18,7 @@ export function Register() {
     confirmPassword: "",
     role: "Staff" as "Admin" | "Staff" | "Cashier",
   });
-  const { users, setUsers, currentUser } = useApp();
+  const { currentUser } = useApp();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -41,51 +41,62 @@ export function Register() {
       return;
     }
 
-    // Check if email or username already exists
-    const existingUser = users.find(
-      (u) => u.email === formData.email || u.username === formData.username,
-    );
-    if (existingUser) {
-      toast.error("Email or username already exists");
+    const { data: existingEmail, error: emailError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", formData.email)
+      .limit(1);
+
+    if (emailError) {
+      console.error("Email lookup error:", emailError);
+      toast.error("Unable to check email. Please try again.");
       return;
     }
 
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp(
-      {
-        email: formData.email,
-        password: formData.password,
-      },
-      {
-        data: {
-          name: formData.username,
-          role: formData.role,
-        },
-      },
-    );
+    if (existingEmail && existingEmail.length > 0) {
+      toast.error("Email already exists. Please use a different one.");
+      return;
+    }
 
-    if (signUpError || !signUpData?.user?.id) {
-      console.error(signUpError);
-      toast.error("Unable to create account. Please try again.");
+    const { data: existingUsername, error: usernameError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("username", formData.username)
+      .limit(1);
+
+    if (usernameError) {
+      console.error("Username lookup error:", usernameError);
+      toast.error("Unable to check username. Please try again.");
+      return;
+    }
+
+    if (existingUsername && existingUsername.length > 0) {
+      toast.error("Username already exists. Please use a different one.");
       return;
     }
 
     const newUser = {
-      id: signUpData.user.id,
-      name: formData.username,
       username: formData.username,
+      name: formData.username,
       email: formData.email,
+      password: formData.password,
       role: formData.role,
     };
 
-    const { error } = await supabase.from("profiles").insert([newUser]);
+    const { data, error } = await supabase.from("users").insert([newUser]).select();
 
     if (error) {
-      console.error(error);
-      toast.error("Unable to save profile. Please try again.");
+      console.error("Create user error:", error);
+      if (error.code === "23505") {
+        toast.error("Email or username already exists. Please use a different one.");
+      } else if (error.code === "42P01") {
+        toast.error("Database schema missing. Run the SQL schema from the SQL Editor.");
+      } else {
+        toast.error(`Unable to create account: ${error.message}`);
+      }
       return;
     }
 
-    setUsers([...users, newUser]);
     toast.success("Account created successfully! Please login.");
     navigate("/login");
   };

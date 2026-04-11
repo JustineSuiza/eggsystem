@@ -1,6 +1,6 @@
 import { useApp } from "../context/app-context";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Package, TrendingUp, TrendingDown, DollarSign, AlertTriangle } from "lucide-react";
+import { Package, TrendingUp, DollarSign, AlertTriangle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Badge } from "./ui/badge";
 

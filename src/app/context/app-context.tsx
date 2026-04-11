@@ -18,167 +18,35 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  // Initial users with default admin
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: "1",
-      name: "Admin User",
-      username: "admin",
-      password: "admin123",
-      role: "Admin",
-    },
-    {
-      id: "2",
-      name: "John Staff",
-      username: "staff",
-      password: "staff123",
-      role: "Staff",
-    },
-    {
-      id: "3",
-      name: "Jane Cashier",
-      username: "cashier",
-      password: "cashier123",
-      role: "Cashier",
-    },
-  ]);
-
-  // Initial products
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: "1",
-      name: "Small Eggs",
-      price: 3.99,
-      trayPrice: 119.70,
-      stockQuantity: 150,
-      dateAdded: "2026-03-01",
-    },
-    {
-      id: "2",
-      name: "Medium Eggs",
-      price: 4.49,
-      trayPrice: 134.70,
-      stockQuantity: 200,
-      dateAdded: "2026-03-01",
-    },
-    {
-      id: "3",
-      name: "Large Eggs",
-      price: 5.29,
-      trayPrice: 158.70,
-      stockQuantity: 180,
-      dateAdded: "2026-03-01",
-    },
-    {
-      id: "4",
-      name: "Jumbo Eggs",
-      price: 6.49,
-      trayPrice: 194.70,
-      stockQuantity: 100,
-      dateAdded: "2026-03-01",
-    },
-  ]);
-
-  // Initial stock in records
-  const [stockInRecords, setStockInRecords] = useState<StockInRecord[]>([
-    {
-      id: "1",
-      productId: "1",
-      quantityAdded: 50,
-      missingQuantity: 0,
-      crackedQuantity: 0,
-      dateReceived: "2026-03-10",
-      userId: "2",
-    },
-    {
-      id: "2",
-      productId: "2",
-      quantityAdded: 100,
-      missingQuantity: 0,
-      crackedQuantity: 0,
-      dateReceived: "2026-03-11",
-      userId: "2",
-    },
-    {
-      id: "3",
-      productId: "3",
-      quantityAdded: 80,
-      missingQuantity: 0,
-      crackedQuantity: 0,
-      dateReceived: "2026-03-12",
-      userId: "2",
-    },
-  ]);
-
-  // Initial sales records
-  const [salesRecords, setSalesRecords] = useState<SaleRecord[]>([
-    {
-      id: "1",
-      productId: "1",
-      quantitySoldPcs: 20,
-      quantitySoldTray: 0,
-      totalAmount: 79.8,
-      saleDate: "2026-03-13",
-      userId: "3",
-    },
-    {
-      id: "2",
-      productId: "2",
-      quantitySoldPcs: 30,
-      quantitySoldTray: 0,
-      totalAmount: 134.7,
-      saleDate: "2026-03-13",
-      userId: "3",
-    },
-    {
-      id: "3",
-      productId: "3",
-      quantitySoldPcs: 25,
-      quantitySoldTray: 0,
-      totalAmount: 132.25,
-      saleDate: "2026-03-13",
-      userId: "3",
-    },
-  ]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [stockInRecords, setStockInRecords] = useState<StockInRecord[]>([]);
+  const [salesRecords, setSalesRecords] = useState<SaleRecord[]>([]);
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
     const loadSupabaseData = async () => {
-      const [{ data: sessionData }, { data: profilesData, error: profilesError }, { data: productsData, error: productsError }, { data: stockData, error: stockError }, { data: salesData, error: salesError }] = await Promise.all([
-        supabase.auth.getSession() as Promise<any>,
-        supabase.from("profiles").select("*") as Promise<any>,
+      const [{ data: usersData, error: usersError }, { data: productsData, error: productsError }, { data: stockData, error: stockError }, { data: salesData, error: salesError }] = await Promise.all([
+        supabase.from("users").select("*") as Promise<any>,
         supabase.from("products").select("*") as Promise<any>,
         supabase.from("stock_in_records").select("*") as Promise<any>,
         supabase.from("sales_records").select("*") as Promise<any>,
       ]);
 
-      if (!profilesError && profilesData && profilesData.length > 0) {
+      if (!usersError && usersData) {
         setUsers(
-          profilesData.map((profile: any) => ({
-            id: profile.id,
-            name: profile.name,
-            username: profile.username,
-            email: profile.email,
-            role: profile.role,
+          usersData.map((user: any) => ({
+            id: user.id.toString(),
+            name: user.name,
+            username: user.username,
+            email: user.email,
+            role: user.role,
           })) as User[],
         );
       }
 
-      if (sessionData?.session?.user?.id && profilesData) {
-        const matchingProfile = profilesData.find((profile: any) => profile.id === sessionData.session.user.id);
-        if (matchingProfile) {
-          setCurrentUser({
-            id: matchingProfile.id,
-            name: matchingProfile.name,
-            username: matchingProfile.username,
-            email: matchingProfile.email,
-            role: matchingProfile.role,
-          });
-        }
-      }
-
-      if (!productsError && productsData && productsData.length > 0) {
+      if (!productsError && productsData) {
         setProducts(
           productsData.map((product: any) => ({
             ...product,
@@ -189,7 +57,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           })) as Product[],
         );
       }
-      if (!stockError && stockData && stockData.length > 0) {
+
+      if (!stockError && stockData) {
         setStockInRecords(
           stockData.map((record: any) => ({
             ...record,
@@ -197,12 +66,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
             missingQuantity: Number(record.missing_quantity),
             crackedQuantity: Number(record.cracked_quantity),
             dateReceived: record.date_received,
-            userId: record.user_id,
-            productId: record.product_id,
+            userId: record.user_id.toString(),
+            productId: record.product_id.toString(),
           })) as StockInRecord[],
         );
       }
-      if (!salesError && salesData && salesData.length > 0) {
+
+      if (!salesError && salesData) {
         setSalesRecords(
           salesData.map((record: any) => ({
             ...record,
@@ -210,8 +80,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
             quantitySoldTray: Number(record.quantity_sold_tray),
             totalAmount: Number(record.total_amount),
             saleDate: record.sale_date,
-            userId: record.user_id,
-            productId: record.product_id,
+            userId: record.user_id.toString(),
+            productId: record.product_id.toString(),
           })) as SaleRecord[],
         );
       }
@@ -219,6 +89,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     void loadSupabaseData();
   }, []);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("currentUser");
+    if (storedUser) {
+      try {
+        setCurrentUser(JSON.parse(storedUser));
+      } catch {
+        localStorage.removeItem("currentUser");
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem("currentUser", JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem("currentUser");
+    }
+  }, [currentUser]);
 
   return (
     <AppContext.Provider

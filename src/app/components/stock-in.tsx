@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useApp } from "../context/app-context";
 import { supabase } from "../../lib/supabase";
+import { getNextNumericId } from "../../lib/db-utils";
 import { StockInRecord } from "../types";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -23,24 +24,46 @@ export function StockIn() {
     dateReceived: new Date().toISOString().split("T")[0],
   });
 
-  const canAdd = currentUser?.role === "Admin" || currentUser?.role === "Staff" || currentUser?.role === "Cashier";
+  const canAdd = currentUser?.role === "Admin" || currentUser?.role === "Staff";
 
   const handleAddStock = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!currentUser) return;
 
-    const actualStockAdded = parseInt(formData.quantityAdded) - (parseInt(formData.missingQuantity) || 0) - (parseInt(formData.crackedQuantity) || 0);
-
     // Insert stock in record
+    const product = products.find((p) => p.id === formData.productId);
+    if (!product) {
+      toast.error("Selected product not found.");
+      return;
+    }
+
+    const quantityAdded = parseInt(formData.quantityAdded, 10);
+    const missingQuantity = parseInt(formData.missingQuantity, 10) || 0;
+    const crackedQuantity = parseInt(formData.crackedQuantity, 10) || 0;
+    const actualStockAdded = quantityAdded - missingQuantity - crackedQuantity;
+
+    if (!formData.productId || isNaN(quantityAdded) || quantityAdded <= 0 || actualStockAdded < 0) {
+      toast.error("Please enter a valid stock quantity and select a product.");
+      return;
+    }
+
+    if (!currentUser) {
+      toast.error("Unable to identify the current logged-in user. Please log in again.");
+      return;
+    }
+
     const stockInData = {
-      product_id: parseInt(formData.productId),
-      quantity_added: parseInt(formData.quantityAdded),
-      missing_quantity: parseInt(formData.missingQuantity) || 0,
-      cracked_quantity: parseInt(formData.crackedQuantity) || 0,
+      id: await getNextNumericId("stock_in_records"),
+      product_id: parseInt(formData.productId, 10),
+      quantity_added: quantityAdded,
+      missing_quantity: missingQuantity,
+      cracked_quantity: crackedQuantity,
       date_received: formData.dateReceived,
-      user_id: currentUser.id,
+      user_id: parseInt(currentUser.id, 10),
     };
+
+    console.log("Attempting stock insert with:", stockInData);
 
     const { data: stockData, error: stockError } = await supabase
       .from("stock_in_records")
@@ -48,17 +71,25 @@ export function StockIn() {
       .select();
 
     if (stockError || !stockData || stockData.length === 0) {
-      console.error(stockError);
-      toast.error("Failed to add stock record");
+      console.error("Stock insert error:", stockError);
+      console.error("Stock data:", stockData);
+      console.error("Current user:", currentUser);
+      console.error("Stock data to insert:", stockInData);
+      toast.error(`Failed to add stock record: ${stockError?.message || 'Unknown error'}`);
       return;
     }
 
-    // Update product stock quantity
     const { error: updateError } = await supabase
       .from("products")
-      .update({ stock_quantity: null })
-      .eq("id", parseInt(formData.productId))
+      .update({ stock_quantity: product.stockQuantity + actualStockAdded })
+      .eq("id", parseInt(formData.productId, 10))
       .select();
+
+    if (updateError) {
+      console.error("Product stock update error:", updateError);
+      toast.error(`Stock record saved, but failed to update product stock: ${updateError.message}`);
+      return;
+    }
 
     if (updateError) {
       console.error(updateError);

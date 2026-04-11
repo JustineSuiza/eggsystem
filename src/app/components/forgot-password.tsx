@@ -32,7 +32,7 @@ export function ForgotPassword() {
       return;
     }
 
-    const { data, error } = await supabase.auth.resetPasswordForEmail(user.email);
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email);
 
     if (error) {
       console.error(error);

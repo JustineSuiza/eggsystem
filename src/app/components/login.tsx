@@ -7,12 +7,11 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { toast } from "sonner";
-import { Egg } from "lucide-react";
 
 export function Login() {
   const [emailOrUsername, setEmailOrUsername] = useState("");
   const [password, setPassword] = useState("");
-  const { users, setCurrentUser, currentUser } = useApp();
+  const { currentUser, setCurrentUser } = useApp();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -24,33 +23,45 @@ export function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const user = users.find(
-      (u) => u.email === emailOrUsername || u.username === emailOrUsername,
-    );
+    const userInput = emailOrUsername.trim();
+    const passwordInput = password.trim();
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userInput);
 
-    if (!user) {
+    const { data: userData, error: userError } = isEmail
+      ? await supabase.from("users").select("*").ilike("email", userInput).maybeSingle()
+      : await supabase.from("users").select("*").eq("username", userInput).maybeSingle();
+
+    console.debug("Login query result:", { isEmail, userInput, passwordInput, userData, userError });
+
+    if (userError) {
+      console.error("Login lookup error:", userError);
+      toast.error(`Login error: ${userError.message}`);
+      return;
+    }
+
+    if (!userData) {
       toast.error("Invalid email or password");
       return;
     }
 
-    if (!user.email) {
-      toast.error("No email found for this account. Please use a Supabase-backed account.");
+    const user = userData;
+
+    if (user.password !== passwordInput) {
+      toast.error("Invalid email or password");
       return;
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const loggedInUser = {
+      id: user.id.toString(),
+      name: user.name,
+      username: user.username,
       email: user.email,
-      password,
-    });
+      role: user.role,
+    };
 
-    if (error || !data.session) {
-      console.error(error);
-      toast.error("Invalid email or password");
-      return;
-    }
-
-    setCurrentUser(user);
-    toast.success(`Welcome back, ${user.name}!`);
+    setCurrentUser(loggedInUser);
+    console.log("Login successful, currentUser set:", loggedInUser);
+    toast.success(`Welcome back, ${loggedInUser.name}!`);
     navigate("/");
   };
 
@@ -103,7 +114,7 @@ export function Login() {
               Login
             </Button>
           </form>
-          <div className="mt-4 text-center space-y-2">
+          <div className="mt-4 text-center">
             <p className="text-sm text-gray-600">
               Don't have an account?{" "}
               <Link to="/register" className="text-amber-600 hover:text-amber-700 font-medium">

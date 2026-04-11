@@ -4,6 +4,7 @@ import { Products } from "./components/products";
 import { StockIn } from "./components/stock-in";
 import { Sales } from "./components/sales";
 import { Users } from "./components/users";
+import { SqlEditor } from "./components/sql-editor";
 import { Login } from "./components/login";
 import { Register } from "./components/register";
 import { ForgotPassword } from "./components/forgot-password";
@@ -31,6 +32,7 @@ export const router = createBrowserRouter([
       { path: "stock-in", Component: StockIn },
       { path: "sales", Component: Sales },
       { path: "users", Component: Users },
+      { path: "sql-editor", Component: SqlEditor },
     ],
   },
 ]);

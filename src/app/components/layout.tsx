@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Outlet, useNavigate, Link, useLocation } from "react-router";
 import { useApp } from "../context/app-context";
 import { Button } from "./ui/button";
-import { LayoutDashboard, Package, TrendingUp, TrendingDown, Users, LogOut, Egg, Menu, X } from "lucide-react";
+import { LayoutDashboard, Package, TrendingUp, TrendingDown, Users, LogOut, Egg, Menu, X, Database } from "lucide-react";
 
 export function Layout() {
   const { currentUser, setCurrentUser } = useApp();
@@ -15,11 +15,6 @@ export function Layout() {
       navigate("/login");
     }
   }, [currentUser, navigate]);
-
-  // Close sidebar when route changes on mobile
-  useEffect(() => {
-    setIsSidebarOpen(false);
-  }, [location.pathname]);
 
   if (!currentUser) {
     return null;
@@ -35,7 +30,9 @@ export function Layout() {
     { path: "/products", label: "Products", icon: Package },
     { path: "/stock-in", label: "Stock In", icon: TrendingUp },
     { path: "/sales", label: "Sales", icon: TrendingDown },
-    ...(currentUser.role === "Admin" ? [{ path: "/users", label: "Users", icon: Users }] : []),
+    ...(currentUser?.role === "Admin" ? [
+      { path: "/users", label: "Users", icon: Users },
+    ] : []),
   ];
 
   return (

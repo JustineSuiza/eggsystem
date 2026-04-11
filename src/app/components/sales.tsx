@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useApp } from "../context/app-context";
 import { supabase } from "../../lib/supabase";
+import { getNextNumericId } from "../../lib/db-utils";
 import { SaleRecord } from "../types";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -15,6 +16,8 @@ import { Badge } from "./ui/badge";
 
 export function Sales() {
   const { products, setProducts, salesRecords, setSalesRecords, currentUser, users } = useApp();
+
+  console.log("Sales component - currentUser:", currentUser);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [saleItems, setSaleItems] = useState([{
     productId: "",
@@ -66,13 +69,19 @@ export function Sales() {
 
       const totalAmount = (product.price * quantitySoldPcs) + (product.trayPrice * quantitySoldTray);
 
+    if (!currentUser) {
+      toast.error("Unable to identify the current user. Please log in again.");
+      return;
+    }
+
       salesToInsert.push({
+        id: await getNextNumericId("sales_records"),
         product_id: parseInt(item.productId),
         quantity_sold_pcs: quantitySoldPcs,
         quantity_sold_tray: quantitySoldTray,
         total_amount: totalAmount,
         sale_date: formData.saleDate,
-        user_id: currentUser.id,
+        user_id: parseInt(currentUser.id, 10),
       });
     }
 
@@ -84,8 +93,11 @@ export function Sales() {
       .select();
 
     if (salesError || !salesData) {
-      console.error(salesError);
-      toast.error("Failed to record sales");
+      console.error("Sales insert error:", salesError);
+      console.error("Sales data:", salesData);
+      console.error("Current user:", currentUser);
+      console.error("Sales data to insert:", salesToInsert);
+      toast.error(`Failed to record sales: ${salesError?.message || 'Unknown error'}`);
       return;
     }
 
@@ -407,7 +419,7 @@ export function Sales() {
                     const subtotal = (product.price * pcs) + (product.trayPrice * trays);
                     return { index, product, pcs, trays, subtotal };
                   })
-                  .filter(Boolean);
+                  .filter((item): item is NonNullable<typeof item> => item !== null);
                 
                 const totalAmount = itemsWithTotals.reduce((sum, item) => sum + item.subtotal, 0);
                 

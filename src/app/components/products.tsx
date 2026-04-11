@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useApp } from "../context/app-context";
 import { supabase } from "../../lib/supabase";
+import { getNextNumericId } from "../../lib/db-utils";
 import { Product } from "../types";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -24,24 +25,34 @@ export function Products() {
     stockQuantity: "",
   });
 
-  const canModify = currentUser?.role === "Admin" || currentUser?.role === "Staff" || currentUser?.role === "Cashier";
+  const canModify = currentUser?.role === "Admin";
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    const price = parseFloat(formData.price);
+    const trayPrice = parseFloat(formData.trayPrice);
+    const stockQuantity = parseInt(formData.stockQuantity, 10);
+
+    if (!formData.name.trim() || isNaN(price) || isNaN(trayPrice) || isNaN(stockQuantity)) {
+      toast.error("Please enter valid product name, price, tray price, and stock quantity.");
+      return;
+    }
+
     const newProduct = {
-      name: formData.name,
-      price: parseFloat(formData.price),
-      tray_price: parseFloat(formData.trayPrice),
-      stock_quantity: parseInt(formData.stockQuantity),
+      id: await getNextNumericId("products"),
+      name: formData.name.trim(),
+      price,
+      tray_price: trayPrice,
+      stock_quantity: stockQuantity,
       date_added: new Date().toISOString().split("T")[0],
     };
 
     const { data, error } = await supabase.from("products").insert([newProduct]).select();
 
     if (error) {
-      console.error(error);
-      toast.error("Failed to add product");
+      console.error("Add product error:", error);
+      toast.error(`Failed to add product: ${error.message}`);
       return;
     }
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApp } from "../context/app-context";
 import { supabase } from "../../lib/supabase";
 import { User, UserRole } from "../types";
@@ -27,6 +27,41 @@ export function Users() {
   });
 
   const isAdmin = currentUser?.role === "Admin";
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const loadUsersFromSupabase = async () => {
+    setLoadingUsers(true);
+    setFetchError(null);
+
+    const { data, error } = await supabase.from("users").select("*");
+
+    if (error) {
+      console.error("Unable to load users:", error);
+      setFetchError(error.message);
+      setLoadingUsers(false);
+      return;
+    }
+
+    if (data) {
+      const mappedUsers: User[] = data.map((user: any) => ({
+        id: user.id.toString(),
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      }));
+      setUsers(mappedUsers);
+    }
+
+    setLoadingUsers(false);
+  };
+
+  useEffect(() => {
+    if (isAdmin && users.length === 0) {
+      void loadUsersFromSupabase();
+    }
+  }, [isAdmin, users.length]);
 
   if (!isAdmin) {
     return (
@@ -57,44 +92,56 @@ export function Users() {
       return;
     }
 
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-      options: {
-        data: {
-          name: formData.name,
-          username: formData.username,
-          role: formData.role,
-        },
-      },
-    });
+    const { data: emailData, error: emailError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", formData.email)
+      .limit(1);
 
-    if (signUpError || !signUpData?.user?.id) {
-      console.error(signUpError);
-      toast.error(`Failed to create user account: ${signUpError?.message || 'Unknown error'}`);
+    if (emailError) {
+      console.error(emailError);
+      toast.error("Failed to check email. Please try again.");
       return;
     }
 
-    const profileData = {
-      id: signUpData.user.id,
+    if (emailData && emailData.length > 0) {
+      toast.error("Email already exists");
+      return;
+    }
+
+    const { data: usernameData, error: usernameError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("username", formData.username)
+      .limit(1);
+
+    if (usernameError) {
+      console.error(usernameError);
+      toast.error("Failed to check username. Please try again.");
+      return;
+    }
+
+    if (usernameData && usernameData.length > 0) {
+      toast.error("Username already exists");
+      return;
+    }
+
+    const { data, error } = await supabase.from("users").insert([{
       username: formData.username,
       name: formData.name,
       email: formData.email,
+      password: formData.password,
       role: formData.role,
-    };
+    }]).select();
 
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .insert([profileData]);
-
-    if (profileError) {
-      console.error(profileError);
-      toast.error("Failed to create user profile. Please try again.");
+    if (error || !data || data.length === 0) {
+      console.error(error);
+      toast.error(`Failed to create user account: ${error?.message || 'Unknown error'}`);
       return;
     }
 
     const newUser: User = {
-      id: signUpData.user.id,
+      id: data[0].id.toString(),
       name: formData.name,
       username: formData.username,
       email: formData.email,
@@ -123,14 +170,14 @@ export function Users() {
     }
 
     const { error } = await supabase
-      .from("profiles")
+      .from("users")
       .update({
         name: formData.name,
         username: formData.username,
         email: formData.email,
         role: formData.role,
       })
-      .eq("id", editingUser.id);
+      .eq("id", parseInt(editingUser.id, 10));
 
     if (error) {
       console.error(error);
@@ -164,11 +211,11 @@ export function Users() {
     }
 
     if (confirm("Are you sure you want to delete this user?")) {
-      // Delete from profiles table
+      // Delete from users table
       const { error } = await supabase
-        .from("profiles")
+        .from("users")
         .delete()
-        .eq("id", userId);
+        .eq("id", parseInt(userId, 10));
 
       if (error) {
         console.error(error);
@@ -316,55 +363,71 @@ export function Users() {
         </CardHeader>
         <CardContent>
           <div className="max-h-[600px] overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">
-                      {user.name}
-                      {user.id === currentUser?.id && (
-                        <Badge variant="outline" className="ml-2">
-                          You
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>{user.username}</TableCell>
-                    <TableCell>
-                      <Badge className={getRoleBadgeVariant(user.role)}>
-                        {user.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditDialog(user)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteUser(user.id)}
-                          disabled={user.id === currentUser?.id}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            {loadingUsers ? (
+              <div className="p-8 text-center text-sm text-gray-500">
+                Loading users...
+              </div>
+            ) : fetchError ? (
+              <div className="p-8 text-center text-sm text-red-500">
+                Failed to load users: {fetchError}
+              </div>
+            ) : users.length === 0 ? (
+              <div className="p-8 text-center text-sm text-gray-500">
+                No users found. Please add a user or check your database permissions.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">
+                        {user.name}
+                        {user.id === currentUser?.id && (
+                          <Badge variant="outline" className="ml-2">
+                            You
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>{user.username}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <Badge className={getRoleBadgeVariant(user.role)}>
+                          {user.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditDialog(user)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteUser(user.id)}
+                            disabled={user.id === currentUser?.id}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </div>
         </CardContent>
       </Card>
