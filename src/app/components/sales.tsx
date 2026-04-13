@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "./ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { toast } from "sonner";
-import { Plus, TrendingDown, DollarSign, Printer, Trash2 } from "lucide-react";
+import { Plus, TrendingDown, DollarSign, Printer, Trash2, TrendingUp, ShoppingCart, Calendar } from "lucide-react";
 import { Badge } from "./ui/badge";
 
 export function Sales() {
@@ -217,6 +217,12 @@ export function Sales() {
   };
 
   const filteredRecords = salesRecords.filter((sale) => sale.saleDate === selectedDate);
+
+  // Calculate statistics
+  const totalSalesAmount = salesRecords.reduce((sum, s) => sum + s.totalAmount, 0);
+  const totalRecordsCount = salesRecords.length;
+  const currentDaySalesAmount = filteredRecords.reduce((sum, s) => sum + s.totalAmount, 0);
+  const currentDayRecordsCount = filteredRecords.length;
 
   const handlePrint = () => {
     const reportContent = `
@@ -442,6 +448,53 @@ export function Sales() {
             </DialogContent>
           </Dialog>
         </div>
+      </div>
+
+      {/* Summary Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
+            <DollarSign className="h-4 w-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-semibold">₱{totalSalesAmount.toFixed(2)}</div>
+            <p className="text-xs text-gray-500 mt-1">All time</p>
+          </CardContent>
+        </Card>
+
+        <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Records</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-semibold">{totalRecordsCount}</div>
+            <p className="text-xs text-gray-500 mt-1">All time</p>
+          </CardContent>
+        </Card>
+
+        <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Today's Sales</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-semibold">₱{currentDaySalesAmount.toFixed(2)}</div>
+            <p className="text-xs text-gray-500 mt-1">{selectedDate}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Today's Records</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-purple-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-semibold">{currentDayRecordsCount}</div>
+            <p className="text-xs text-gray-500 mt-1">{selectedDate}</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
