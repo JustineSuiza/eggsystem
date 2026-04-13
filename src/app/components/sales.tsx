@@ -21,6 +21,7 @@ export function Sales() {
   console.log("Sales component - currentUser:", currentUser);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [saleToDelete, setSaleToDelete] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [saleItems, setSaleItems] = useState([{
     productId: "",
     quantitySoldPcs: "",
@@ -156,6 +157,8 @@ export function Sales() {
     toast.success("Sale deleted successfully");
     setSaleToDelete(null);
   };
+
+  const filteredRecords = salesRecords.filter((sale) => sale.saleDate === selectedDate);
 
   const handlePrint = () => {
     const reportContent = `
@@ -334,6 +337,37 @@ export function Sales() {
                   Add Product
                 </Button>
 
+                {saleItems.some(item => item.productId) && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+                    <h4 className="font-semibold text-sm text-blue-900">Order Summary</h4>
+                    {saleItems.map((item, index) => {
+                      if (!item.productId) return null;
+                      const product = products.find((p) => p.id.toString() === item.productId.toString());
+                      if (!product) return null;
+                      const quantitySoldPcs = parseInt(item.quantitySoldPcs) || 0;
+                      const quantitySoldTray = parseInt(item.quantitySoldTray) || 0;
+                      const itemTotal = (product.price * quantitySoldPcs) + (product.trayPrice * quantitySoldTray);
+                      return (
+                        <div key={index} className="flex justify-between text-sm text-blue-800">
+                          <span>{product.name} ({quantitySoldPcs} pcs, {quantitySoldTray} tray)</span>
+                          <span className="font-medium">₱{itemTotal.toFixed(2)}</span>
+                        </div>
+                      );
+                    })}
+                    <div className="border-t border-blue-200 pt-2 flex justify-between font-semibold text-blue-900">
+                      <span>Total Amount:</span>
+                      <span className="text-lg">₱{saleItems.reduce((sum, item) => {
+                        if (!item.productId) return sum;
+                        const product = products.find((p) => p.id.toString() === item.productId.toString());
+                        if (!product) return sum;
+                        const quantitySoldPcs = parseInt(item.quantitySoldPcs) || 0;
+                        const quantitySoldTray = parseInt(item.quantitySoldTray) || 0;
+                        return sum + (product.price * quantitySoldPcs) + (product.trayPrice * quantitySoldTray);
+                      }, 0).toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <Button type="submit" className="flex-1">
                     Record Sale
@@ -349,23 +383,32 @@ export function Sales() {
               </form>
             </DialogContent>
           </Dialog>
-
-          <Button variant="outline" onClick={handlePrint}>
-            <Printer className="h-4 w-4 mr-2" />
-            Print Report
-          </Button>
         </div>
       </div>
 
       <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <CardHeader>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <CardTitle>Sales Records</CardTitle>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="saleDate" className="text-sm">Date</Label>
+            <Input
+              id="saleDate"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="w-44"
+            />
+            <Button variant="outline" onClick={handlePrint}>
+              <Printer className="h-4 w-4 mr-2" />
+              Print
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="max-h-[600px] overflow-y-auto">
-            {salesRecords.length === 0 ? (
+            {filteredRecords.length === 0 ? (
               <div className="p-8 text-center text-sm text-gray-500">
-                No sales records found
+                No sales records for this date
               </div>
             ) : (
               <Table>
@@ -381,7 +424,7 @@ export function Sales() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {salesRecords.map((sale) => (
+                  {filteredRecords.map((sale) => (
                     <TableRow key={sale.id}>
                       <TableCell className="font-medium">
                         {getProductName(sale.productId)}
