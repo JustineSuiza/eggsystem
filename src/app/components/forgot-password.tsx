@@ -27,23 +27,13 @@ export function ForgotPassword() {
       (u) => u.email === identifier || u.username === identifier,
     );
 
-    if (!user?.email) {
+    if (!user) {
       toast.error("Email or username not found");
       return;
     }
 
-    const { error } = await supabase.auth.resetPasswordForEmail(user.email);
-
-    if (error) {
-      console.error(error);
-      toast.error("Unable to send password reset email. Please try again.");
-      return;
-    }
-
-    toast.success(
-      "Password reset email sent. Check your inbox and follow the instructions to reset your password.",
-    );
-    navigate("/login");
+    // Navigate to reset password page with user ID
+    navigate(`/reset-password?user=${user.id}`);
   };
 
   return (
@@ -57,7 +47,7 @@ export function ForgotPassword() {
           </div>
           <CardTitle className="text-2xl">Forgot Password</CardTitle>
           <CardDescription>
-            Enter your email or username to receive a password reset email.
+            Enter your email or username to reset your password.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -74,7 +64,7 @@ export function ForgotPassword() {
               />
             </div>
             <Button type="submit" className="w-full">
-              Send reset email
+              Reset Password
             </Button>
           </form>
           <div className="mt-6 text-center">

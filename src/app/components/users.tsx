@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Shield } from "lucide-react";
+import { Plus, Pencil, Trash2, Shield, Eye, EyeOff } from "lucide-react";
 import { Badge } from "./ui/badge";
 
 export function Users() {
@@ -18,6 +18,7 @@ export function Users() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     username: "",
@@ -169,14 +170,21 @@ export function Users() {
       return;
     }
 
+    const updateData: any = {
+      name: formData.name,
+      username: formData.username,
+      email: formData.email,
+      role: formData.role,
+    };
+
+    // Only update password if a new one is provided
+    if (formData.password.trim()) {
+      updateData.password = formData.password;
+    }
+
     const { error } = await supabase
       .from("users")
-      .update({
-        name: formData.name,
-        username: formData.username,
-        email: formData.email,
-        role: formData.role,
-      })
+      .update(updateData)
       .eq("id", parseInt(editingUser.id, 10));
 
     if (error) {
@@ -228,15 +236,30 @@ export function Users() {
     }
   };
 
-  const openEditDialog = (user: User) => {
+  const openEditDialog = async (user: User) => {
     setEditingUser(user);
+    
+    // Fetch current password from database
+    const { data, error } = await supabase
+      .from("users")
+      .select("password")
+      .eq("id", parseInt(user.id, 10))
+      .single();
+
+    if (error) {
+      console.error("Failed to fetch user password:", error);
+      toast.error("Failed to load user data");
+      return;
+    }
+
     setFormData({
       name: user.name,
       username: user.username,
       email: user.email || "",
-      password: "",
+      password: data.password,
       role: user.role,
     });
+    setShowPassword(false); // Reset password visibility
     setIsEditDialogOpen(true);
   };
 
@@ -433,7 +456,14 @@ export function Users() {
       </Card>
 
       {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) {
+          setEditingUser(null);
+          setShowPassword(false);
+          setFormData({ name: "", username: "", email: "", password: "", role: "Staff" });
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
@@ -476,15 +506,31 @@ export function Users() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-password">Password</Label>
-              <Input
-                id="edit-password"
-                type="password"
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="edit-password"
+                  type={showPassword ? "text" : "password"}
+                  value={formData.password}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
+                  required
+                  className={`pr-10 ${showPassword ? "opacity-75" : ""}`}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={`absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent ${showPassword ? "opacity-60" : ""}`}
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 opacity-60" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-role">Role</Label>
@@ -512,7 +558,12 @@ export function Users() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsEditDialogOpen(false)}
+                onClick={() => {
+                  setIsEditDialogOpen(false);
+                  setEditingUser(null);
+                  setShowPassword(false);
+                  setFormData({ name: "", username: "", email: "", password: "", role: "Staff" });
+                }}
               >
                 Cancel
               </Button>

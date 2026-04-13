@@ -8,6 +8,7 @@ import { SqlEditor } from "./components/sql-editor";
 import { Login } from "./components/login";
 import { Register } from "./components/register";
 import { ForgotPassword } from "./components/forgot-password";
+import { ResetPassword } from "./components/reset-password";
 import { Layout } from "./components/layout";
 
 export const router = createBrowserRouter([
@@ -22,6 +23,10 @@ export const router = createBrowserRouter([
   {
     path: "/forgot-password",
     Component: ForgotPassword,
+  },
+  {
+    path: "/reset-password",
+    Component: ResetPassword,
   },
   {
     path: "/",
