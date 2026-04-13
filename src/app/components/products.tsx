@@ -157,7 +157,7 @@ export function Products() {
                 Add Product
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-white animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <DialogContent className="bg-[#f0e7d4] animate-in fade-in slide-in-from-bottom-4 duration-300">
               <DialogHeader>
                 <DialogTitle>Add New Product</DialogTitle>
                 <DialogDescription>
@@ -293,7 +293,7 @@ export function Products() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="bg-white animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <DialogContent className="bg-[#f0e7d4] animate-in fade-in slide-in-from-bottom-4 duration-300">
           <DialogHeader>
             <DialogTitle>Edit Product</DialogTitle>
             <DialogDescription>

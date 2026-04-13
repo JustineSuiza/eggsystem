@@ -318,7 +318,7 @@ export function StockIn() {
                 Add Stock
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-white">
+            <DialogContent className="bg-[#f0e7d4] animate-in fade-in slide-in-from-bottom-4 duration-300">
               <DialogHeader>
                 <DialogTitle>Record Stock Receipt</DialogTitle>
                 <DialogDescription>Enter the details of the stock received.</DialogDescription>
