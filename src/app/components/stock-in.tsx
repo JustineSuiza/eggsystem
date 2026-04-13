@@ -158,6 +158,7 @@ export function StockIn() {
     const product = products.find(p => p.id.toString() === recordToDelete.productId);
     if (product) {
       const actualStockAdded = recordToDelete.quantityAdded - recordToDelete.missingQuantity - recordToDelete.crackedQuantity;
+      console.log(`Restoring stock for product ${product.id}: ${product.stockQuantity} - ${actualStockAdded} = ${product.stockQuantity - actualStockAdded}`);
       const { error: updateError } = await supabase
         .from("products")
         .update({ stock_quantity: product.stockQuantity - actualStockAdded })
@@ -167,6 +168,8 @@ export function StockIn() {
         console.error("Stock restore error:", updateError);
         toast.error("Record deleted but failed to restore stock");
         return;
+      } else {
+        console.log(`Stock restored successfully for product ${product.id}`);
       }
 
       // Update local state

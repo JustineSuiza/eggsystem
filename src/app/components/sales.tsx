@@ -111,6 +111,7 @@ export function Sales() {
         .reduce((sum, s) => sum + s.quantity_sold_pcs + (s.quantity_sold_tray * 30), 0);
 
       if (soldQty > 0) {
+        console.log(`Updating stock for product ${p.id}: ${p.stockQuantity} - ${soldQty} = ${p.stockQuantity - soldQty}`);
         const { error: updateError } = await supabase
           .from("products")
           .update({ stock_quantity: p.stockQuantity - soldQty })
@@ -118,8 +119,12 @@ export function Sales() {
 
         if (updateError) {
           console.error("Stock update error:", updateError);
-          toast.error(`Failed to update stock for ${p.name}`);
+          toast.error(`Failed to update stock for ${p.name}: ${updateError.message}`);
+          // Continue anyway? Or return?
+          // For now, return to prevent inconsistent state
           return;
+        } else {
+          console.log(`Stock updated successfully for product ${p.id}`);
         }
       }
     }
@@ -184,6 +189,7 @@ export function Sales() {
     const product = products.find(p => p.id.toString() === saleToDelete.productId);
     if (product) {
       const restoreQty = saleToDelete.quantitySoldPcs + (saleToDelete.quantitySoldTray * 30);
+      console.log(`Restoring stock for product ${product.id}: ${product.stockQuantity} + ${restoreQty} = ${product.stockQuantity + restoreQty}`);
       const { error: updateError } = await supabase
         .from("products")
         .update({ stock_quantity: product.stockQuantity + restoreQty })
@@ -193,6 +199,8 @@ export function Sales() {
         console.error("Stock restore error:", updateError);
         toast.error("Sale deleted but failed to restore stock");
         return;
+      } else {
+        console.log(`Stock restored successfully for product ${product.id}`);
       }
 
       // Update local state
