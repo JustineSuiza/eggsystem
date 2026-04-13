@@ -8,7 +8,7 @@ import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { toast } from "sonner";
-import { Egg, ArrowLeft } from "lucide-react";
+import { Egg, ArrowLeft, Eye, EyeOff } from "lucide-react";
 
 export function Register() {
   const [formData, setFormData] = useState({
@@ -18,6 +18,8 @@ export function Register() {
     confirmPassword: "",
     role: "Staff" as "Admin" | "Staff" | "Cashier",
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { currentUser } = useApp();
   const navigate = useNavigate();
 
@@ -111,9 +113,6 @@ export function Register() {
             </div>
           </div>
           <CardTitle className="text-2xl">Create Account</CardTitle>
-          <CardDescription>
-            Join the Egg Inventory System
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleRegister} className="space-y-4">
@@ -159,27 +158,59 @@ export function Register() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required
-                placeholder="••••••••"
-                minLength={6}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  required
+                  placeholder="••••••••"
+                  minLength={6}
+                  className={`pr-10 ${showPassword ? "opacity-75" : ""}`}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={`absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent ${showPassword ? "opacity-60" : ""}`}
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 opacity-60" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                required
-                placeholder="••••••••"
-                minLength={6}
-              />
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  required
+                  placeholder="••••••••"
+                  minLength={6}
+                  className={`pr-10 ${showConfirmPassword ? "opacity-75" : ""}`}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={`absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent ${showConfirmPassword ? "opacity-60" : ""}`}
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4 opacity-60" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
             <Button type="submit" className="w-full">
               Create Account
