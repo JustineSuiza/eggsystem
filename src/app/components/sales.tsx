@@ -40,7 +40,6 @@ export function Sales() {
       return;
     }
 
-    // Get the first ID upfront to avoid race condition
     let nextId = await getNextNumericId("sales_records");
     const salesToInsert: any[] = [];
     let hasErrors = false;
@@ -88,7 +87,7 @@ export function Sales() {
         sale_date: formData.saleDate,
         user_id: parseInt(currentUser.id, 10),
       });
-      nextId++; // Increment for next item
+      nextId++;
     }
 
     if (hasErrors) return;
@@ -98,12 +97,9 @@ export function Sales() {
       .insert(salesToInsert)
       .select();
 
-    if (salesError || !salesData) {
+    if (salesError || !salesData || salesData.length === 0) {
       console.error("Sales insert error:", salesError);
-      console.error("Sales data:", salesData);
-      console.error("Current user:", currentUser);
-      console.error("Sales data to insert:", salesToInsert);
-      toast.error(`Failed to record sales: ${salesError?.message || 'Unknown error'}`);
+      toast.error(`Failed to record sale: ${salesError?.message || 'Unknown error'}`);
       return;
     }
 
@@ -114,56 +110,26 @@ export function Sales() {
       quantitySoldTray: sale.quantity_sold_tray,
       totalAmount: sale.total_amount,
       saleDate: sale.sale_date,
-      userId: sale.user_id,
+      userId: sale.user_id.toString(),
     }));
 
-    const updatedProducts = products.map((product) => {
-      const totalSold = newSales
-        .filter(sale => sale.productId.toString() === product.id.toString())
-        .reduce((sum, sale) => sum + sale.quantitySoldPcs + (sale.quantitySoldTray * 30), 0);
-      
+    setSalesRecords([...newSales, ...salesRecords]);
+    const updatedProducts = products.map((p) => {
+      const soldQty = salesToInsert
+        .filter((s) => s.product_id === p.id)
+        .reduce((sum, s) => sum + s.quantity_sold_pcs + (s.quantity_sold_tray * 30), 0);
+
       return {
-        ...product,
-        stockQuantity: product.stockQuantity - totalSold
+        ...p,
+        stockQuantity: p.stockQuantity - soldQty,
       };
     });
 
     setProducts(updatedProducts);
-    setSalesRecords([...newSales, ...salesRecords]);
-    
-    const totalAmount = newSales.reduce((sum, sale) => sum + sale.totalAmount, 0);
-    toast.success(`Sale recorded: ₱${totalAmount.toFixed(2)} (${newSales.length} items)`);
-    
+    toast.success("Sale recorded successfully");
     setIsDialogOpen(false);
-    setSaleItems([{
-      productId: "",
-      quantitySoldPcs: "",
-      quantitySoldTray: "",
-    }]);
-    setFormData({
-      saleDate: new Date().toISOString().split("T")[0],
-    });
-  };
-
-  const handleAddSaleItem = () => {
-    setSaleItems([...saleItems, {
-      productId: "",
-      quantitySoldPcs: "",
-      quantitySoldTray: "",
-    }]);
-  };
-
-  const handleRemoveSaleItem = (index: number) => {
-    if (saleItems.length > 1) {
-      setSaleItems(saleItems.filter((_, i) => i !== index));
-    }
-  };
-
-  const handleUpdateSaleItem = (index: number, field: string, value: string) => {
-    const updatedItems = saleItems.map((item, i) =>
-      i === index ? { ...item, [field]: value } : item
-    );
-    setSaleItems(updatedItems);
+    setSaleItems([{ productId: "", quantitySoldPcs: "", quantitySoldTray: "" }]);
+    setFormData({ saleDate: new Date().toISOString().split("T")[0] });
   };
 
   const getProductName = (productId: string) => {
@@ -187,12 +153,11 @@ export function Sales() {
     }
 
     setSalesRecords(salesRecords.filter((s) => s.id !== saleId));
-    toast.success("Sale record deleted successfully");
+    toast.success("Sale deleted successfully");
     setSaleToDelete(null);
   };
 
   const handlePrint = () => {
-    // Generate sales report content
     const reportContent = `
       <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto;">
         <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px;">
@@ -205,170 +170,111 @@ export function Sales() {
           <h3 style="margin-top: 0; color: #333;">Report Summary</h3>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
             <div style="background: white; padding: 15px; border-radius: 5px; text-align: center; border: 1px solid #dee2e6;">
-              <div style="font-size: 24px; font-weight: bold; color: #28a745;">₱${filteredRevenue.toFixed(2)}</div>
-              <div style="color: #6c757d; font-size: 14px;">Today's Sales Revenue</div>
+              <div style="font-size: 24px; font-weight: bold; color: #28a745;">₱${salesRecords.reduce((sum, s) => sum + s.totalAmount, 0).toFixed(2)}</div>
+              <div style="color: #6c757d; font-size: 14px;">Total Sales</div>
             </div>
             <div style="background: white; padding: 15px; border-radius: 5px; text-align: center; border: 1px solid #dee2e6;">
-              <div style="font-size: 24px; font-weight: bold; color: #007bff;">${filteredItems}</div>
-              <div style="color: #6c757d; font-size: 14px;">Items Sold Today</div>
-            </div>
-            <div style="background: white; padding: 15px; border-radius: 5px; text-align: center; border: 1px solid #dee2e6;">
-              <div style="font-size: 24px; font-weight: bold; color: #6c757d;">${filteredSales.length}</div>
-              <div style="color: #6c757d; font-size: 14px;">Total Transactions</div>
+              <div style="font-size: 24px; font-weight: bold; color: #007bff;">${salesRecords.length}</div>
+              <div style="color: #6c757d; font-size: 14px;">Total Records</div>
             </div>
           </div>
         </div>
 
         <div style="margin-bottom: 30px;">
-          <h3 style="color: #333; border-bottom: 1px solid #dee2e6; padding-bottom: 10px;">Sales Details for ${selectedDate}</h3>
-          ${filteredSales.length === 0 ? 
-            '<p style="text-align: center; color: #6c757d; font-style: italic; padding: 40px;">No sales records found for this date.</p>' :
-            `<table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
-              <thead>
-                <tr style="background: #f8f9fa;">
-                  <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: 600; color: #495057;">Product</th>
-                  <th style="border: 1px solid #dee2e6; padding: 12px; text-align: center; font-weight: 600; color: #495057;">Pieces</th>
-                  <th style="border: 1px solid #dee2e6; padding: 12px; text-align: center; font-weight: 600; color: #495057;">Trays</th>
-                  <th style="border: 1px solid #dee2e6; padding: 12px; text-align: right; font-weight: 600; color: #495057;">Amount</th>
-                  <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: 600; color: #495057;">Cashier</th>
+          <h3 style="color: #333; border-bottom: 1px solid #dee2e6; padding-bottom: 10px;">Sales Details</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+            <thead>
+              <tr style="background: #f8f9fa;">
+                <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: 600; color: #495057;">Product</th>
+                <th style="border: 1px solid #dee2e6; padding: 12px; text-align: center; font-weight: 600; color: #495057;">Qty (pcs)</th>
+                <th style="border: 1px solid #dee2e6; padding: 12px; text-align: center; font-weight: 600; color: #495057;">Qty (tray)</th>
+                <th style="border: 1px solid #dee2e6; padding: 12px; text-align: right; font-weight: 600; color: #495057;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${salesRecords.map((sale, idx) => `
+                <tr style="background: ${idx % 2 === 0 ? '#fff' : '#f8f9fa'};">
+                  <td style="border: 1px solid #dee2e6; padding: 12px;">${getProductName(sale.productId)}</td>
+                  <td style="border: 1px solid #dee2e6; padding: 12px; text-align: center;">${sale.quantitySoldPcs}</td>
+                  <td style="border: 1px solid #dee2e6; padding: 12px; text-align: center;">${sale.quantitySoldTray}</td>
+                  <td style="border: 1px solid #dee2e6; padding: 12px; text-align: right; font-weight: 600; color: #28a745;">₱${sale.totalAmount.toFixed(2)}</td>
                 </tr>
-              </thead>
-              <tbody>
-                ${filteredSales.map((sale, index) => `
-                  <tr style="background: ${index % 2 === 0 ? '#fff' : '#f8f9fa'};">
-                    <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: 500;">${getProductName(sale.productId)}</td>
-                    <td style="border: 1px solid #dee2e6; padding: 12px; text-align: center;">${sale.quantitySoldPcs}</td>
-                    <td style="border: 1px solid #dee2e6; padding: 12px; text-align: center;">${sale.quantitySoldTray}</td>
-                    <td style="border: 1px solid #dee2e6; padding: 12px; text-align: right; font-weight: 600; color: #28a745;">₱${sale.totalAmount.toFixed(2)}</td>
-                    <td style="border: 1px solid #dee2e6; padding: 12px;">${getUserName(sale.userId)}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-              <tfoot>
-                <tr style="background: #e9ecef; font-weight: bold;">
-                  <td colspan="3" style="border: 1px solid #dee2e6; padding: 12px; text-align: right; font-weight: 600;">Total:</td>
-                  <td style="border: 1px solid #dee2e6; padding: 12px; text-align: right; font-weight: 600; color: #28a745;">₱${filteredRevenue.toFixed(2)}</td>
-                  <td style="border: 1px solid #dee2e6; padding: 12px;"></td>
-                </tr>
-              </tfoot>
-            </table>`
-          }
+              `).join('')}
+            </tbody>
+          </table>
         </div>
 
-        <div style="text-align: center; color: #6c757d; font-size: 12px; border-top: 1px solid #dee2e6; padding-top: 20px; margin-top: 40px;">
-          <p>This report was generated automatically by the Egg Management System</p>
+        <div style="text-align: center; font-size: 12px; color: #6c757d; margin-top: 40px; border-top: 1px solid #dee2e6; padding-top: 20px;">
+          <p style="margin: 5px 0;">This is a computer-generated report.</p>
         </div>
       </div>
     `;
 
-    // Create a temporary print window
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    if (!printWindow) {
-      alert('Please allow popups for this website to print reports');
-      return;
+    const printWindow = window.open("", "", "height=800,width=1000");
+    if (printWindow) {
+      printWindow.document.write(reportContent);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 250);
     }
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Sales Report - ${selectedDate}</title>
-          <style>
-            @media print {
-              body { margin: 0; }
-              @page { margin: 0.5in; }
-            }
-          </style>
-        </head>
-        <body>
-          ${reportContent}
-        </body>
-      </html>
-    `);
-
-    printWindow.document.close();
-    
-    // Wait for content to load then print
-    printWindow.onload = () => {
-      printWindow.print();
-      printWindow.close();
-    };
   };
-
-  // Sort sales by date (newest first)
-  const sortedSales = [...salesRecords].sort(
-    (a, b) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime()
-  );
-
-  // Calculate statistics
-  const totalSales = salesRecords.reduce((sum, s) => sum + s.totalAmount, 0);
-  const totalItemsSold = salesRecords.reduce((sum, s) => sum + s.quantitySoldPcs + (s.quantitySoldTray * 30), 0);
-
-  // Date filter for sales record view
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
-
-  const filteredSales = sortedSales.filter((s) => s.saleDate === selectedDate);
-  const filteredRevenue = filteredSales.reduce((sum, s) => sum + s.totalAmount, 0);
-  const filteredItems = filteredSales.reduce(
-    (sum, s) => sum + s.quantitySoldPcs + (s.quantitySoldTray * 30),
-    0
-  );
 
   return (
     <div className="p-4 lg:p-8">
       <div className="mb-6 lg:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold mb-2">Sales</h1>
-          <p className="text-gray-500">Record and track sales transactions</p>
+          <p className="text-gray-500">Record and manage sales transactions</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              New Sale
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[70vh] overflow-y-auto bg-white">
-            <DialogHeader>
-              <DialogTitle>Record Sale</DialogTitle>
-              <DialogDescription>Enter the details of the sale</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleRecordSale} className="space-y-4">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label>Products</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAddSaleItem}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Product
-                  </Button>
+        <div className="flex gap-2">
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Record Sale
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Record New Sale</DialogTitle>
+                <DialogDescription>
+                  Enter sale details. You can add multiple products in one sale.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleRecordSale} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="saleDate">Sale Date</Label>
+                  <Input
+                    id="saleDate"
+                    type="date"
+                    value={formData.saleDate}
+                    onChange={(e) => setFormData({ ...formData, saleDate: e.target.value })}
+                    required
+                  />
                 </div>
 
-                {saleItems.map((item, index) => (
-                  <div key={index} className="p-4 border rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium">Product {index + 1}</Label>
-                      {saleItems.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRemoveSaleItem(index)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          Remove
-                        </Button>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
+                <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                  {saleItems.map((item, index) => (
+                    <div key={index} className="p-3 border rounded-lg space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm">Product {index + 1}</Label>
+                        {saleItems.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSaleItems(saleItems.filter((_, i) => i !== index))}
+                          >
+                            Remove
+                          </Button>
+                        )}
+                      </div>
                       <Select
                         value={item.productId}
-                        onValueChange={(value) => handleUpdateSaleItem(index, 'productId', value)}
+                        onValueChange={(value) => {
+                          const newItems = [...saleItems];
+                          newItems[index].productId = value;
+                          setSaleItems(newItems);
+                        }}
                         required
                       >
                         <SelectTrigger>
@@ -376,224 +282,106 @@ export function Sales() {
                         </SelectTrigger>
                         <SelectContent>
                           {products.map((product) => (
-                            <SelectItem key={product.id} value={product.id}>
-                              {product.name} - ₱{product.price.toFixed(2)} pcs / ₱{product.trayPrice.toFixed(2)} tray (Stock: {product.stockQuantity})
+                            <SelectItem key={product.id} value={product.id.toString()}>
+                              {product.name} (Stock: {product.stockQuantity})
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                    </div>
-
-                    {item.productId && (
-                      <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-700">
-                        {(() => {
-                          const selectedProduct = products.find((p) => p.id.toString() === item.productId.toString());
-                          if (!selectedProduct) return null;
-                          return (
-                            <div className="space-y-1">
-                              <p className="font-medium">{selectedProduct.name}</p>
-                              <p>Stock: {selectedProduct.stockQuantity} pcs</p>
-                              <p>Price (pcs): ₱{selectedProduct.price.toFixed(2)}</p>
-                              <p>Price (tray): ₱{selectedProduct.trayPrice.toFixed(2)}</p>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label htmlFor={`quantityPcs-${index}`}>Sold pcs</Label>
-                        <Input
-                          id={`quantityPcs-${index}`}
-                          type="number"
-                          value={item.quantitySoldPcs}
-                          onChange={(e) => handleUpdateSaleItem(index, 'quantitySoldPcs', e.target.value)}
-                          placeholder="0"
-                          min="0"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`quantityTray-${index}`}>Sold per tray</Label>
-                        <Input
-                          id={`quantityTray-${index}`}
-                          type="number"
-                          value={item.quantitySoldTray}
-                          onChange={(e) => handleUpdateSaleItem(index, 'quantitySoldTray', e.target.value)}
-                          placeholder="0"
-                          min="0"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="date">Sale Date</Label>
-                      <Input
-                        id="date"
-                        type="date"
-                        value={formData.saleDate}
-                        onChange={(e) =>
-                          setFormData({ ...formData, saleDate: e.target.value })
-                        }
-                        required
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {(() => {
-                const itemsWithTotals = saleItems
-                  .map((item, index) => {
-                    if (!item.productId) return null;
-                    const product = products.find(p => p.id.toString() === item.productId.toString());
-                    if (!product) return null;
-                    const pcs = parseInt(item.quantitySoldPcs) || 0;
-                    const trays = parseInt(item.quantitySoldTray) || 0;
-                    const subtotal = (product.price * pcs) + (product.trayPrice * trays);
-                    return { index, product, pcs, trays, subtotal };
-                  })
-                  .filter((item): item is NonNullable<typeof item> => item !== null);
-                
-                const totalAmount = itemsWithTotals.reduce((sum, item) => sum + item.subtotal, 0);
-                
-                return itemsWithTotals.length > 0 && (
-                  <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200 space-y-4">
-                    <div className="space-y-2">
-                      <h3 className="font-semibold text-emerald-900">Sale Summary</h3>
-                      <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {itemsWithTotals.map((item) => (
-                          <div key={item.index} className="flex items-center justify-between text-sm bg-white p-2 rounded">
-                            <span className="text-gray-700">
-                              {item.product.name}
-                              {item.pcs > 0 && <span className="ml-1">• {item.pcs} pcs @ ₱{item.product.price.toFixed(2)}</span>}
-                              {item.trays > 0 && <span className="ml-1">• {item.trays} tray @ ₱{item.product.trayPrice.toFixed(2)}</span>}
-                            </span>
-                            <span className="font-semibold text-emerald-700">₱{item.subtotal.toFixed(2)}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="border-t border-emerald-300 pt-2 mt-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-emerald-900">Total Amount:</span>
-                          <span className="text-2xl font-bold text-emerald-700">
-                            ₱{totalAmount.toFixed(2)}
-                          </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label htmlFor={`pcs-${index}`} className="text-sm">Qty (pcs)</Label>
+                          <Input
+                            id={`pcs-${index}`}
+                            type="number"
+                            min="0"
+                            value={item.quantitySoldPcs}
+                            onChange={(e) => {
+                              const newItems = [...saleItems];
+                              newItems[index].quantitySoldPcs = e.target.value;
+                              setSaleItems(newItems);
+                            }}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`tray-${index}`} className="text-sm">Qty (tray)</Label>
+                          <Input
+                            id={`tray-${index}`}
+                            type="number"
+                            min="0"
+                            value={item.quantitySoldTray}
+                            onChange={(e) => {
+                              const newItems = [...saleItems];
+                              newItems[index].quantitySoldTray = e.target.value;
+                              setSaleItems(newItems);
+                            }}
+                            placeholder="0"
+                          />
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })()}
+                  ))}
+                </div>
 
-              <div className="flex gap-2">
-                <Button type="submit" className="flex-1">
-                  Record Sale
-                </Button>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
+                  className="w-full"
+                  onClick={() => setSaleItems([...saleItems, { productId: "", quantitySoldPcs: "", quantitySoldTray: "" }])}
                 >
-                  Cancel
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Product
                 </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+
+                <div className="flex gap-2">
+                  <Button type="submit" className="flex-1">
+                    Record Sale
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          <Button variant="outline" onClick={handlePrint}>
+            <Printer className="h-4 w-4 mr-2" />
+            Print Report
+          </Button>
+        </div>
       </div>
-
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Sales Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">₱{totalSales.toFixed(2)}</div>
-            <p className="text-xs text-gray-500 mt-1">All time</p>
-          </CardContent>
-        </Card>
-
-        <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Items Sold</CardTitle>
-            <TrendingDown className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{totalItemsSold}</div>
-            <p className="text-xs text-gray-500 mt-1">{salesRecords.length} transactions</p>
-          </CardContent>
-        </Card>
-
-        <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today's Sales</CardTitle>
-            <DollarSign className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">₱{filteredRevenue.toFixed(2)}</div>
-            <p className="text-xs text-gray-500 mt-1">{filteredSales.length} transactions</p>
-          </CardContent>
-        </Card>
-
-        <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Items Sold Today</CardTitle>
-            <TrendingDown className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{filteredItems}</div>
-            <p className="text-xs text-gray-500 mt-1">{selectedDate}</p>
-          </CardContent>
-        </Card>
-      </div>
-
 
       <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <CardTitle className="flex items-center gap-2">
-            Sales Records
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="recordDate" className="text-sm">Date</Label>
-            <Input
-              id="recordDate"
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-44"
-            />
-            <Button variant="outline" onClick={handlePrint}>
-              <Printer className="h-4 w-4 mr-2" />
-              Print
-            </Button>
-          </div>
+        <CardHeader>
+          <CardTitle>Sales Records</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="max-h-[600px] overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Sold pcs</TableHead>
-                  <TableHead>Sold per tray</TableHead>
-                  <TableHead>Total Amount</TableHead>
-                  <TableHead>Sale Date</TableHead>
-                  <TableHead>Cashier</TableHead>
-                  {currentUser?.role === "Admin" && <TableHead>Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSales.length === 0 ? (
+            {salesRecords.length === 0 ? (
+              <div className="p-8 text-center text-sm text-gray-500">
+                No sales records found
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={currentUser?.role === "Admin" ? 7 : 6} className="text-center text-gray-500 py-8">
-                      No sales records for this date
-                    </TableCell>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Sold pcs</TableHead>
+                    <TableHead>Sold per tray</TableHead>
+                    <TableHead>Total Amount</TableHead>
+                    <TableHead>Sale Date</TableHead>
+                    <TableHead>Cashier</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ) : (
-                  filteredSales.map((sale) => (
+                </TableHeader>
+                <TableBody>
+                  {salesRecords.map((sale) => (
                     <TableRow key={sale.id}>
                       <TableCell className="font-medium">
                         {getProductName(sale.productId)}
@@ -611,23 +399,22 @@ export function Sales() {
                       <TableCell className="text-gray-500">
                         {getUserName(sale.userId)}
                       </TableCell>
-                      {currentUser?.role === "Admin" && (
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSaleToDelete(sale.id)}
-                            className="hover:text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </TableCell>
-                      )}
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSaleToDelete(sale.id)}
+                          className="hover:text-red-600"
+                          title="Delete sale"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </div>
         </CardContent>
       </Card>

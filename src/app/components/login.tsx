@@ -128,14 +128,6 @@ export function Login() {
               Login
             </Button>
           </form>
-          <div className="mt-4 text-center">
-            <p className="text-sm text-gray-600">
-              Don't have an account?{" "}
-              <Link to="/register" className="text-amber-600 hover:text-amber-700 font-medium">
-                Create Account
-              </Link>
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>

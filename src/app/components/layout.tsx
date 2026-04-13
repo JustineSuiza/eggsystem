@@ -30,7 +30,7 @@ export function Layout() {
     { path: "/products", label: "Products", icon: Package },
     { path: "/stock-in", label: "Stock In", icon: TrendingUp },
     { path: "/sales", label: "Sales", icon: TrendingDown },
-    ...(currentUser?.role === "Admin" ? [
+    ...(currentUser?.role === "Admin" || currentUser?.role === "Owner" ? [
       { path: "/users", label: "Users", icon: Users },
     ] : []),
   ];

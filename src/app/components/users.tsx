@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Shield, Eye, EyeOff } from "lucide-react";
+import { Plus, Pencil, Trash2, Shield, Eye, EyeOff, Archive, RotateCcw } from "lucide-react";
 import { Badge } from "./ui/badge";
 
 export function Users() {
@@ -19,6 +19,8 @@ export function Users() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [archivedUsers, setArchivedUsers] = useState<any[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     username: "",
@@ -27,9 +29,20 @@ export function Users() {
     role: "Staff" as UserRole,
   });
 
-  const isAdmin = currentUser?.role === "Admin";
+  const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Owner";
+  const isOwner = currentUser?.role === "Owner";
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const getAvailableRoles = (): UserRole[] => {
+    if (isOwner) {
+      return ["Admin", "Staff", "Cashier"];
+    }
+    if (currentUser?.role === "Admin") {
+      return ["Staff", "Cashier"];
+    }
+    return [];
+  };
 
   const loadUsersFromSupabase = async () => {
     setLoadingUsers(true);
@@ -58,11 +71,24 @@ export function Users() {
     setLoadingUsers(false);
   };
 
+  const loadArchivedUsers = async () => {
+    const { data: archived, error: archivedError } = await supabase.from("archived_users").select("*");
+    if (archived && !archivedError) {
+      setArchivedUsers(archived);
+    }
+  };
+
   useEffect(() => {
     if (isAdmin && users.length === 0) {
       void loadUsersFromSupabase();
     }
   }, [isAdmin, users.length]);
+
+  useEffect(() => {
+    if (isOwner) {
+      void loadArchivedUsers();
+    }
+  }, [isOwner]);
 
   if (!isAdmin) {
     return (
@@ -212,6 +238,98 @@ export function Users() {
     setFormData({ name: "", username: "", email: "", password: "", role: "Staff" });
   };
 
+  const handleArchiveUser = async (user: User) => {
+    if (user.id === currentUser?.id) {
+      toast.error("You cannot archive your own account");
+      return;
+    }
+
+    if (confirm("Are you sure you want to archive this user?")) {
+      // Archive the user
+      const { data: archivedData, error: archiveError } = await supabase
+        .from("archived_users")
+        .insert([{
+          user_id: parseInt(user.id, 10),
+          username: user.username,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          archived_by: parseInt(currentUser?.id || "0", 10),
+        }])
+        .select();
+
+      if (archiveError || !archivedData || archivedData.length === 0) {
+        console.error(archiveError);
+        toast.error("Failed to archive user");
+        return;
+      }
+
+      // Delete from users table
+      const { error } = await supabase
+        .from("users")
+        .delete()
+        .eq("id", parseInt(user.id, 10));
+
+      if (error) {
+        console.error(error);
+        toast.error("Failed to delete user");
+        return;
+      }
+
+      setUsers(users.filter((u) => u.id !== user.id));
+      setArchivedUsers([...archivedUsers, archivedData[0]]);
+      toast.success("User archived successfully");
+      // Reload archived users to ensure fresh data
+      await loadArchivedUsers();
+    }
+  };
+
+  const handleRestoreUser = async (archivedUser: any) => {
+    if (confirm("Are you sure you want to restore this user?")) {
+      // Create new user from archived data
+      const { data, error: insertError } = await supabase
+        .from("users")
+        .insert([{
+          username: archivedUser.username,
+          email: archivedUser.email,
+          name: archivedUser.name,
+          role: archivedUser.role,
+          password: "restored123", // Default password for restored users
+        }])
+        .select();
+
+      if (insertError || !data) {
+        console.error(insertError);
+        toast.error("Failed to restore user");
+        return;
+      }
+
+      // Remove from archived
+      const { error } = await supabase
+        .from("archived_users")
+        .delete()
+        .eq("id", archivedUser.id);
+
+      if (error) {
+        console.error(error);
+        toast.error("Failed to remove from archive");
+        return;
+      }
+
+      setArchivedUsers(archivedUsers.filter((u) => u.id !== archivedUser.id));
+      setUsers([...users, {
+        id: data[0].id.toString(),
+        name: archivedUser.name,
+        username: archivedUser.username,
+        email: archivedUser.email,
+        role: archivedUser.role,
+      }]);
+      toast.success("User restored successfully. Default password: restored123");
+      // Reload archived users to ensure fresh data
+      await loadArchivedUsers();
+    }
+  };
+
   const handleDeleteUser = async (userId: string) => {
     if (userId === currentUser?.id) {
       toast.error("You cannot delete your own account");
@@ -265,6 +383,8 @@ export function Users() {
 
   const getRoleBadgeVariant = (role: UserRole) => {
     switch (role) {
+      case "Owner":
+        return "bg-purple-600 text-white hover:bg-purple-700";
       case "Admin":
         return "default";
       case "Staff":
@@ -357,9 +477,9 @@ export function Users() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Admin">Admin</SelectItem>
-                    <SelectItem value="Staff">Staff</SelectItem>
-                    <SelectItem value="Cashier">Cashier</SelectItem>
+                    {isOwner && <SelectItem value="Admin">Admin</SelectItem>}
+                    {getAvailableRoles().includes("Staff") && <SelectItem value="Staff">Staff</SelectItem>}
+                    {getAvailableRoles().includes("Cashier") && <SelectItem value="Cashier">Cashier</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
@@ -382,7 +502,70 @@ export function Users() {
 
       <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
         <CardHeader>
-          <CardTitle>All Users</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>All Users</CardTitle>
+            {isOwner && (
+              <Dialog open={showArchived} onOpenChange={setShowArchived}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Archive className="h-4 w-4 mr-2" />
+                    Archived Users
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-5xl">
+                  <DialogHeader>
+                    <DialogTitle>Archived Users</DialogTitle>
+                    <DialogDescription>
+                      View and restore archived user records.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="max-h-[70vh] overflow-y-auto">
+                    {archivedUsers.length === 0 ? (
+                      <div className="p-8 text-center text-sm text-gray-500">
+                        No archived users
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Username</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Role</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {archivedUsers.map((archivedUser) => (
+                            <TableRow key={archivedUser.id}>
+                              <TableCell className="font-medium">{archivedUser.name}</TableCell>
+                              <TableCell>{archivedUser.username}</TableCell>
+                              <TableCell>{archivedUser.email}</TableCell>
+                              <TableCell>
+                                <Badge className={getRoleBadgeVariant(archivedUser.role)}>
+                                  {archivedUser.role}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRestoreUser(archivedUser)}
+                                  title="Restore user"
+                                >
+                                  <RotateCcw className="h-4 w-4 text-green-500" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="max-h-[600px] overflow-y-auto">
@@ -436,14 +619,17 @@ export function Users() {
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteUser(user.id)}
-                            disabled={user.id === currentUser?.id}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
+                          {isOwner && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleArchiveUser(user)}
+                              disabled={user.id === currentUser?.id}
+                              title="Archive user"
+                            >
+                              <Archive className="h-4 w-4 text-orange-500" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -454,6 +640,8 @@ export function Users() {
           </div>
         </CardContent>
       </Card>
+
+
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
@@ -545,9 +733,9 @@ export function Users() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Admin">Admin</SelectItem>
-                  <SelectItem value="Staff">Staff</SelectItem>
-                  <SelectItem value="Cashier">Cashier</SelectItem>
+                  {isOwner && <SelectItem value="Admin">Admin</SelectItem>}
+                  {getAvailableRoles().includes("Staff") && <SelectItem value="Staff">Staff</SelectItem>}
+                  {getAvailableRoles().includes("Cashier") && <SelectItem value="Cashier">Cashier</SelectItem>}
                 </SelectContent>
               </Select>
             </div>

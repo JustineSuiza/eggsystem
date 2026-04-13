@@ -12,12 +12,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "./ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { toast } from "sonner";
-import { Plus, TrendingUp, Trash2 } from "lucide-react";
+import { Plus, TrendingUp, Trash2, Printer } from "lucide-react";
 
 export function StockIn() {
   const { products, setProducts, stockInRecords, setStockInRecords, currentUser, users } = useApp();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [formData, setFormData] = useState({
     productId: "",
     quantityAdded: "",
@@ -26,7 +27,7 @@ export function StockIn() {
     dateReceived: new Date().toISOString().split("T")[0],
   });
 
-  const canAdd = currentUser?.role === "Admin" || currentUser?.role === "Staff";
+  const canAdd = currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Staff";
 
   const handleAddStock = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,6 +134,7 @@ export function StockIn() {
   const getUserName = (userId: string) => {
     return users.find((u) => u.id.toString() === userId.toString())?.name || "Unknown"
   };
+
   const handleDeleteRecord = async (recordId: string) => {
     const { error } = await supabase
       .from("stock_in_records")
@@ -149,10 +151,124 @@ export function StockIn() {
     toast.success("Record deleted successfully");
     setRecordToDelete(null);
   };
+
+  const handlePrint = () => {
+    // Generate stock in report content
+    const reportContent = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto;">
+        <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px;">
+          <h1 style="margin: 0; color: #333;">Egg Management System</h1>
+          <h2 style="margin: 5px 0; color: #666;">Stock In Report</h2>
+          <p style="margin: 5px 0; color: #888;">Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+          <h3 style="margin-top: 0; color: #333;">Report Summary</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+            <div style="background: white; padding: 15px; border-radius: 5px; text-align: center; border: 1px solid #dee2e6;">
+              <div style="font-size: 24px; font-weight: bold; color: #28a745;">${filteredRecords.reduce((sum, r) => sum + r.quantityAdded, 0)}</div>
+              <div style="color: #6c757d; font-size: 14px;">Total Stock Received</div>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 5px; text-align: center; border: 1px solid #dee2e6;">
+              <div style="font-size: 24px; font-weight: bold; color: #dc3545;">${filteredRecords.reduce((sum, r) => sum + r.missingQuantity, 0)}</div>
+              <div style="color: #6c757d; font-size: 14px;">Missing Units</div>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 5px; text-align: center; border: 1px solid #dee2e6;">
+              <div style="font-size: 24px; font-weight: bold; color: #ffc107;">${filteredRecords.reduce((sum, r) => sum + r.crackedQuantity, 0)}</div>
+              <div style="color: #6c757d; font-size: 14px;">Cracked Units</div>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 5px; text-align: center; border: 1px solid #dee2e6;">
+              <div style="font-size: 24px; font-weight: bold; color: #007bff;">${filteredRecords.length}</div>
+              <div style="color: #6c757d; font-size: 14px;">Total Records</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+          <h3 style="color: #333; border-bottom: 1px solid #dee2e6; padding-bottom: 10px;">Stock In Details for ${selectedDate}</h3>
+          ${filteredRecords.length === 0 ? 
+            '<p style="text-align: center; color: #6c757d; font-style: italic; padding: 40px;">No stock records found for this date.</p>' :
+            `<table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+              <thead>
+                <tr style="background: #f8f9fa;">
+                  <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: 600; color: #495057;">Product</th>
+                  <th style="border: 1px solid #dee2e6; padding: 12px; text-align: center; font-weight: 600; color: #495057;">Quantity Added</th>
+                  <th style="border: 1px solid #dee2e6; padding: 12px; text-align: center; font-weight: 600; color: #495057;">Missing</th>
+                  <th style="border: 1px solid #dee2e6; padding: 12px; text-align: center; font-weight: 600; color: #495057;">Cracked</th>
+                  <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: 600; color: #495057;">Recorded By</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filteredRecords.map((record, index) => `
+                  <tr style="background: ${index % 2 === 0 ? '#fff' : '#f8f9fa'};">
+                    <td style="border: 1px solid #dee2e6; padding: 12px; font-weight: 500;">${getProductName(record.productId)}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 12px; text-align: center; color: #28a745; font-weight: 600;">+${record.quantityAdded}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 12px; text-align: center; color: #dc3545; font-weight: 600;">${record.missingQuantity}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 12px; text-align: center; color: #ffc107; font-weight: 600;">${record.crackedQuantity}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 12px;">${getUserName(record.userId)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+              <tfoot>
+                <tr style="background: #e9ecef; font-weight: bold;">
+                  <td style="border: 1px solid #dee2e6; padding: 12px; text-align: right; font-weight: 600;">Totals:</td>
+                  <td style="border: 1px solid #dee2e6; padding: 12px; text-align: center; font-weight: 600; color: #28a745;">+${filteredRecords.reduce((sum, r) => sum + r.quantityAdded, 0)}</td>
+                  <td style="border: 1px solid #dee2e6; padding: 12px; text-align: center; font-weight: 600; color: #dc3545;">${filteredRecords.reduce((sum, r) => sum + r.missingQuantity, 0)}</td>
+                  <td style="border: 1px solid #dee2e6; padding: 12px; text-align: center; font-weight: 600; color: #ffc107;">${filteredRecords.reduce((sum, r) => sum + r.crackedQuantity, 0)}</td>
+                  <td style="border: 1px solid #dee2e6; padding: 12px;"></td>
+                </tr>
+              </tfoot>
+            </table>`
+          }
+        </div>
+
+        <div style="text-align: center; color: #6c757d; font-size: 12px; border-top: 1px solid #dee2e6; padding-top: 20px; margin-top: 40px;">
+          <p>This report was generated automatically by the Egg Management System</p>
+        </div>
+      </div>
+    `;
+
+    // Create a temporary print window
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) {
+      alert('Please allow popups for this website to print reports');
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Stock In Report - ${selectedDate}</title>
+          <style>
+            @media print {
+              body { margin: 0; }
+              @page { margin: 0.5in; }
+            }
+          </style>
+        </head>
+        <body>
+          ${reportContent}
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    
+    // Wait for content to load then print
+    printWindow.onload = () => {
+      printWindow.print();
+      printWindow.close();
+    };
+  };
+
   // Sort records by date (newest first)
   const sortedRecords = [...stockInRecords].sort(
     (a, b) => new Date(b.dateReceived).getTime() - new Date(a.dateReceived).getTime()
   );
+
+  // Filter records by selected date
+  const filteredRecords = sortedRecords.filter((record) => record.dateReceived === selectedDate);
 
   return (
     <div className="p-4 lg:p-8">
@@ -282,8 +398,24 @@ export function StockIn() {
       </div>
 
       <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <CardHeader>
-          <CardTitle>Stock In Records</CardTitle>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <CardTitle className="flex items-center gap-2">
+            Stock In Records
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="recordDate" className="text-sm">Date</Label>
+            <Input
+              id="recordDate"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="w-44"
+            />
+            <Button variant="outline" onClick={handlePrint}>
+              <Printer className="h-4 w-4 mr-2" />
+              Print
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="max-h-[600px] overflow-y-auto">
@@ -296,18 +428,18 @@ export function StockIn() {
                   <TableHead>Cracked</TableHead>
                   <TableHead>Date Received</TableHead>
                   <TableHead>Recorded By</TableHead>
-                  {currentUser?.role === "Admin" && <TableHead>Actions</TableHead>}
+                  {(currentUser?.role === "Admin" || currentUser?.role === "Owner") && <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedRecords.length === 0 ? (
+                {filteredRecords.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={currentUser?.role === "Admin" ? 7 : 6} className="text-center text-gray-500 py-8">
-                      No stock records yet
+                    <TableCell colSpan={currentUser?.role === "Admin" || currentUser?.role === "Owner" ? 7 : 6} className="text-center text-gray-500 py-8">
+                      No stock records for this date
                     </TableCell>
                   </TableRow>
                 ) : (
-                  sortedRecords.map((record) => (
+                  filteredRecords.map((record) => (
                     <TableRow key={record.id}>
                       <TableCell className="font-medium">
                         {getProductName(record.productId)}
@@ -331,13 +463,14 @@ export function StockIn() {
                       <TableCell className="text-gray-500">
                         {getUserName(record.userId)}
                       </TableCell>
-                      {currentUser?.role === "Admin" && (
+                      {(currentUser?.role === "Admin" || currentUser?.role === "Owner") && (
                         <TableCell>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => setRecordToDelete(record.id)}
                             className="hover:text-red-600"
+                            title="Delete record"
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
@@ -351,6 +484,8 @@ export function StockIn() {
           </div>
         </CardContent>
       </Card>
+
+
 
       <AlertDialog open={!!recordToDelete} onOpenChange={(open) => !open && setRecordToDelete(null)}>
         <AlertDialogContent>

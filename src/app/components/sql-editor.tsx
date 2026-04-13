@@ -21,7 +21,7 @@ CREATE TABLE users (
   email TEXT UNIQUE NOT NULL,
   password TEXT NOT NULL,
   name TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('Admin', 'Staff', 'Cashier')),
+  role TEXT NOT NULL CHECK (role IN ('Owner', 'Admin', 'Staff', 'Cashier')),
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
@@ -60,6 +60,45 @@ CREATE TABLE sales_records (
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
+-- Archive tables for soft deletes
+CREATE TABLE archived_users (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  username TEXT NOT NULL,
+  email TEXT NOT NULL,
+  name TEXT NOT NULL,
+  role TEXT NOT NULL,
+  archived_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  archived_by INTEGER,
+  archived_reason TEXT
+);
+
+CREATE TABLE archived_stock_in_records (
+  id SERIAL PRIMARY KEY,
+  record_id INTEGER NOT NULL,
+  product_id INTEGER NOT NULL,
+  quantity_added INTEGER NOT NULL,
+  missing_quantity INTEGER NOT NULL,
+  cracked_quantity INTEGER NOT NULL,
+  date_received DATE NOT NULL,
+  user_id INTEGER NOT NULL,
+  archived_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  archived_by INTEGER
+);
+
+CREATE TABLE archived_sales_records (
+  id SERIAL PRIMARY KEY,
+  record_id INTEGER NOT NULL,
+  product_id INTEGER NOT NULL,
+  quantity_sold_pcs INTEGER NOT NULL,
+  quantity_sold_tray INTEGER NOT NULL,
+  total_amount NUMERIC(10,2) NOT NULL,
+  sale_date DATE NOT NULL,
+  user_id INTEGER NOT NULL,
+  archived_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  archived_by INTEGER
+);
+
 -- Grant the anon/public client permission to use the public schema and access tables
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon, authenticated;
@@ -69,6 +108,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE ON SEQUENCES TO anon, auth
 
 -- Example data for testing
 INSERT INTO users (username, email, password, name, role) VALUES
+  ('justine', 'justine@example.com', 'justine123', 'Justine Suiza', 'Owner'),
   ('admin', 'admin@example.com', 'admin123', 'Admin User', 'Admin'),
   ('staff1', 'staff1@example.com', 'staff123', 'Staff One', 'Staff'),
   ('cashier1', 'cashier1@example.com', 'cashier123', 'Cashier One', 'Cashier');
