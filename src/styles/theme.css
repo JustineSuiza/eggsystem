@@ -119,6 +119,21 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* Card Fade Animation */
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Apply fade animation to all cards */
+[data-slot="card"] {
+  animation: fadeIn 0.3s ease-out forwards !important;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
