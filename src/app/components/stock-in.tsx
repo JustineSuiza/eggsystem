@@ -136,15 +136,45 @@ export function StockIn() {
   };
 
   const handleDeleteRecord = async (recordId: string) => {
-    const { error } = await supabase
+    // First, get the record to restore stock
+    const recordToDelete = stockInRecords.find(r => r.id === recordId);
+    if (!recordToDelete) {
+      toast.error("Stock record not found");
+      return;
+    }
+
+    const { error: deleteError } = await supabase
       .from("stock_in_records")
       .delete()
       .eq("id", parseInt(recordId, 10));
 
-    if (error) {
-      console.error("Delete error:", error);
+    if (deleteError) {
+      console.error("Delete error:", deleteError);
       toast.error("Failed to delete record");
       return;
+    }
+
+    // Restore stock in database
+    const product = products.find(p => p.id.toString() === recordToDelete.productId);
+    if (product) {
+      const actualStockAdded = recordToDelete.quantityAdded - recordToDelete.missingQuantity - recordToDelete.crackedQuantity;
+      const { error: updateError } = await supabase
+        .from("products")
+        .update({ stock_quantity: product.stockQuantity - actualStockAdded })
+        .eq("id", product.id);
+
+      if (updateError) {
+        console.error("Stock restore error:", updateError);
+        toast.error("Record deleted but failed to restore stock");
+        return;
+      }
+
+      // Update local state
+      setProducts(products.map(p =>
+        p.id === product.id
+          ? { ...p, stockQuantity: p.stockQuantity - actualStockAdded }
+          : p
+      ));
     }
 
     setStockInRecords(stockInRecords.filter((r) => r.id !== recordId));

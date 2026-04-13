@@ -104,6 +104,26 @@ export function Sales() {
       return;
     }
 
+    // Update stock in database
+    for (const p of products) {
+      const soldQty = salesToInsert
+        .filter((s) => s.product_id === p.id)
+        .reduce((sum, s) => sum + s.quantity_sold_pcs + (s.quantity_sold_tray * 30), 0);
+
+      if (soldQty > 0) {
+        const { error: updateError } = await supabase
+          .from("products")
+          .update({ stock_quantity: p.stockQuantity - soldQty })
+          .eq("id", p.id);
+
+        if (updateError) {
+          console.error("Stock update error:", updateError);
+          toast.error(`Failed to update stock for ${p.name}`);
+          return;
+        }
+      }
+    }
+
     const newSales: SaleRecord[] = salesData.map((sale: any) => ({
       id: sale.id.toString(),
       productId: sale.product_id.toString(),
@@ -142,15 +162,45 @@ export function Sales() {
   };
 
   const handleDeleteSale = async (saleId: string) => {
-    const { error } = await supabase
+    // First, get the sale record to restore stock
+    const saleToDelete = salesRecords.find(s => s.id === saleId);
+    if (!saleToDelete) {
+      toast.error("Sale record not found");
+      return;
+    }
+
+    const { error: deleteError } = await supabase
       .from("sales_records")
       .delete()
       .eq("id", parseInt(saleId, 10));
 
-    if (error) {
-      console.error("Delete error:", error);
+    if (deleteError) {
+      console.error("Delete error:", deleteError);
       toast.error("Failed to delete sale record");
       return;
+    }
+
+    // Restore stock in database
+    const product = products.find(p => p.id.toString() === saleToDelete.productId);
+    if (product) {
+      const restoreQty = saleToDelete.quantitySoldPcs + (saleToDelete.quantitySoldTray * 30);
+      const { error: updateError } = await supabase
+        .from("products")
+        .update({ stock_quantity: product.stockQuantity + restoreQty })
+        .eq("id", product.id);
+
+      if (updateError) {
+        console.error("Stock restore error:", updateError);
+        toast.error("Sale deleted but failed to restore stock");
+        return;
+      }
+
+      // Update local state
+      setProducts(products.map(p =>
+        p.id === product.id
+          ? { ...p, stockQuantity: p.stockQuantity + restoreQty }
+          : p
+      ));
     }
 
     setSalesRecords(salesRecords.filter((s) => s.id !== saleId));
