@@ -593,47 +593,53 @@ export function Users() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">
-                        {user.name}
-                        {user.id === currentUser?.id && (
-                          <Badge variant="outline" className="ml-2">
-                            You
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{user.username}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        <Badge className={getRoleBadgeVariant(user.role)}>
-                          {user.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditDialog(user)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          {isOwner && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleArchiveUser(user)}
-                              disabled={user.id === currentUser?.id}
-                              title="Archive user"
-                            >
-                              <Archive className="h-4 w-4 text-orange-500" />
-                            </Button>
+                  {users.map((user) => {
+                    // Only allow Admin to edit/archive Staff and Cashier, not Admin or Owner
+                    const canEdit = isOwner || (isAdmin && (user.role === "Staff" || user.role === "Cashier"));
+                    return (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">
+                          {user.name}
+                          {user.id === currentUser?.id && (
+                            <Badge variant="outline" className="ml-2">
+                              You
+                            </Badge>
                           )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell>{user.username}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          <Badge className={getRoleBadgeVariant(user.role)}>
+                            {user.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            {canEdit && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditDialog(user)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {isOwner && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleArchiveUser(user)}
+                                disabled={user.id === currentUser?.id}
+                                title="Archive user"
+                              >
+                                <Archive className="h-4 w-4 text-orange-500" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
