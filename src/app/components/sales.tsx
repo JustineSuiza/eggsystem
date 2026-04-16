@@ -225,6 +225,8 @@ export function Sales() {
   const currentDayRecordsCount = filteredRecords.length;
 
   const handlePrint = () => {
+    const filteredRecords = salesRecords.filter((sale) => sale.saleDate === selectedDate);
+
     const reportContent = `
       <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto;">
         <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px;">
@@ -237,11 +239,11 @@ export function Sales() {
           <h3 style="margin-top: 0; color: #333;">Report Summary</h3>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
             <div style="background: white; padding: 15px; border-radius: 5px; text-align: center; border: 1px solid #dee2e6;">
-              <div style="font-size: 24px; font-weight: bold; color: #28a745;">₱${salesRecords.reduce((sum, s) => sum + s.totalAmount, 0).toFixed(2)}</div>
+              <div style="font-size: 24px; font-weight: bold; color: #28a745;">₱${filteredRecords.reduce((sum, s) => sum + s.totalAmount, 0).toFixed(2)}</div>
               <div style="color: #6c757d; font-size: 14px;">Total Sales</div>
             </div>
             <div style="background: white; padding: 15px; border-radius: 5px; text-align: center; border: 1px solid #dee2e6;">
-              <div style="font-size: 24px; font-weight: bold; color: #007bff;">${salesRecords.length}</div>
+              <div style="font-size: 24px; font-weight: bold; color: #007bff;">${filteredRecords.length}</div>
               <div style="color: #6c757d; font-size: 14px;">Total Records</div>
             </div>
           </div>
@@ -259,7 +261,7 @@ export function Sales() {
               </tr>
             </thead>
             <tbody>
-              ${salesRecords.map((sale, idx) => `
+              ${filteredRecords.map((sale, idx) => `
                 <tr style="background: ${idx % 2 === 0 ? '#fff' : '#f8f9fa'};">
                   <td style="border: 1px solid #dee2e6; padding: 12px;">${getProductName(sale.productId)}</td>
                   <td style="border: 1px solid #dee2e6; padding: 12px; text-align: center;">${sale.quantitySoldPcs}</td>
