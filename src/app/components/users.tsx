@@ -330,6 +330,24 @@ export function Users() {
     }
   };
 
+  const handleDeleteArchivedUser = async (archivedUser: any) => {
+    if (confirm("Are you sure you want to permanently delete this archived user?")) {
+      const { error } = await supabase
+        .from("archived_users")
+        .delete()
+        .eq("id", archivedUser.id);
+
+      if (error) {
+        console.error("Failed to delete archived user:", error);
+        toast.error("Failed to delete archived user");
+        return;
+      }
+
+      setArchivedUsers(archivedUsers.filter((u) => u.id !== archivedUser.id));
+      toast.success("Archived user deleted permanently");
+    }
+  };
+
   const handleDeleteUser = async (userId: string) => {
     if (userId === currentUser?.id) {
       toast.error("You cannot delete your own account");
@@ -547,14 +565,24 @@ export function Users() {
                                 </Badge>
                               </TableCell>
                               <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRestoreUser(archivedUser)}
-                                  title="Restore user"
-                                >
-                                  <RotateCcw className="h-4 w-4 text-green-500" />
-                                </Button>
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRestoreUser(archivedUser)}
+                                    title="Restore user"
+                                  >
+                                    <RotateCcw className="h-4 w-4 text-green-500" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteArchivedUser(archivedUser)}
+                                    title="Delete archived user"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}
